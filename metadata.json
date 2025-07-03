@@ -1,0 +1,6 @@
+{
+  "name": "Latin Theological Seminary Dashboard",
+  "description": "A student dashboard for the Latin Theological Seminary, providing access to courses, assignments, exams, and grades.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
