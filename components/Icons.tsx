@@ -1,4 +1,6 @@
 
+
+
 import React from 'react';
 
 type IconProps = {
@@ -38,8 +40,8 @@ export const ChartBarIcon: React.FC<IconProps> = (props) => (
 );
 
 export const LogoIcon: React.FC<IconProps> = (props) => (
-    <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 width="60%" viewBox="0 0 200 160" enable-background="new 0 0 200 160" xml:space="preserve">
+    <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="100%" viewBox="0 0 200 160" enableBackground="new 0 0 200 160" xmlSpace="preserve" {...props}>
 <path fill="#FFFFFF" opacity="1.000000" stroke="none" 
 	d="
 M99.000000,161.000000 
@@ -370,4 +372,3 @@ export const CheckCircleIcon: React.FC<IconProps> = (props) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
-

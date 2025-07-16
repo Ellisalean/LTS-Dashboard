@@ -1,4 +1,4 @@
-import { User, Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus, Student } from './types.ts';
+import { User, Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus } from './types.ts';
 import { RAW_DATA } from './application/data.ts';
 
 // Helper to clean keys with spaces and other inconsistencies
@@ -15,26 +15,18 @@ const cleanData = (data: any[]) => {
     });
 };
 
-const rawStudents = cleanData(RAW_DATA.Estudiantes);
+// We keep the non-sensitive data processing here
 const rawCourses = cleanData(RAW_DATA.Cursos);
 const rawAssignments = cleanData(RAW_DATA.Asignaciones);
 const rawExams = cleanData(RAW_DATA.Examenes);
 const rawGrades = cleanData(RAW_DATA.Notas);
 const rawMessages = cleanData(RAW_DATA.Mensajes);
 
-
-export const MOCK_STUDENTS: Student[] = rawStudents.map((s: any) => ({
-    name: s.ESTUDIANTE,
-    email: s.Email || 'No disponible',
-    password: s.Contraseña ? String(s.Contraseña).trim() : 'password',
-    active: s.Activo === 'SI',
-}));
-
 // A default user for display if needed, though login will create a specific user.
 export const MOCK_USER: User = {
     name: 'Estudiante LTS',
     email: 'estudiante@lts.edu',
-    avatarUrl: 'https://picsum.photos/seed/student/100/100'
+    avatarUrl: 'https://i.pravatar.cc/150?u=default'
 };
 
 const mapCourseStatus = (status: string): CourseStatus => {
@@ -65,6 +57,7 @@ const formatDate = (dateStr: string) => {
     // Assuming MM/DD/YYYY format from data
     const parts = dateStr.split('/');
     if (parts.length === 3) {
+        // Ensure month and day are correctly padded if needed.
         return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
     }
     return dateStr; // return original if format is unexpected
@@ -75,7 +68,7 @@ export const MOCK_ASSIGNMENTS: Assignment[] = rawAssignments.map((a: any, index:
     course: courseIdToNameMap[a.curso_id] || 'Curso Desconocido',
     title: a.titulo,
     dueDate: formatDate(a.fecha_entrega),
-    isSubmitted: a.entregado,
+    isSubmitted: a.entregado === 'SI' || a.entregado === true,
 }));
 
 export const MOCK_EXAMS: Exam[] = rawExams.map((e: any, index: number) => ({
@@ -98,7 +91,7 @@ export const MOCK_MESSAGES: Message[] = rawMessages.map((m: any, index: number) 
     id: m.id || `msg-${index}`, // Ensure unique ID
     from: m.remitente,
     subject: m.asunto,
-    isRead: m.leido,
+    isRead: m.leido === 'SI' || m.leido === true,
     timestamp: m.fecha_envio
 }));
 

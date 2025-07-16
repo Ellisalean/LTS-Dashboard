@@ -2,21 +2,25 @@ import React, { useState } from 'react';
 import { LogoIcon } from './Icons.tsx';
 
 interface LoginProps {
-    onLogin: (username: string, password: string) => boolean;
+    onLogin: (username: string, password: string) => Promise<boolean>;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        const success = onLogin(username, password);
+        setLoading(true);
+        const success = await onLogin(username, password);
         if (!success) {
             setError('Credenciales incorrectas o usuario inactivo. Inténtelo de nuevo.');
         }
+        // No need to handle success here, App component will re-render the dashboard
+        setLoading(false);
     };
 
     return (
@@ -47,6 +51,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 onChange={(e) => setUsername(e.target.value)}
                                 className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 text-gray-900 dark:text-white dark:bg-gray-700 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                                 placeholder="Nombre de estudiante"
+                                disabled={loading}
                             />
                         </div>
                         <div>
@@ -61,15 +66,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 text-gray-900 dark:text-white dark:bg-gray-700 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                                 placeholder="Contraseña"
+                                disabled={loading}
                             />
                         </div>
                     </div>
 
-                    {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+                    {error && <p className="text-sm text-red-500 text-center pt-2">{error}</p>}
 
                     <div>
-                        <button type="submit" className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 transition-colors">
-                            Iniciar Sesión
+                        <button 
+                          type="submit" 
+                          className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 transition-colors disabled:bg-blue-400 dark:disabled:bg-blue-800"
+                          disabled={loading}
+                        >
+                            {loading ? 'Iniciando...' : 'Iniciar Sesión'}
                         </button>
                     </div>
                 </form>
