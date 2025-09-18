@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grade } from '../../types.ts';
+import { Grade, User } from '../../types.ts';
 import { MOCK_GRADES } from '../../constants.ts';
 import { ChartBarIcon } from '../Icons.tsx';
 
@@ -11,7 +11,13 @@ const getGradeColor = (score: number, maxScore: number) => {
     return 'text-red-500';
 };
 
-const Grades: React.FC = () => {
+interface GradesProps {
+    user: User;
+}
+
+const Grades: React.FC<GradesProps> = ({ user }) => {
+    const userGrades = MOCK_GRADES.filter(grade => grade.studentName === user.name);
+
     return (
         <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
@@ -37,18 +43,26 @@ const Grades: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {MOCK_GRADES.map((grade) => (
-                            <tr key={grade.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{grade.course}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{grade.assignmentTitle}</td>
-                                <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${getGradeColor(grade.score, grade.maxScore)}`}>
-                                    {grade.score} / {grade.maxScore}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
-                                    {((grade.score / grade.maxScore) * 100).toFixed(1)}%
+                        {userGrades.length > 0 ? (
+                            userGrades.map((grade) => (
+                                <tr key={grade.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{grade.course}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{grade.assignmentTitle}</td>
+                                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${getGradeColor(grade.score, grade.maxScore)}`}>
+                                        {grade.score} / {grade.maxScore}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                                        {((grade.score / grade.maxScore) * 100).toFixed(1)}%
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={4} className="text-center px-6 py-4 text-gray-500 dark:text-gray-400">
+                                    No hay notas disponibles para mostrar.
                                 </td>
                             </tr>
-                        ))}
+                        )}
                     </tbody>
                 </table>
             </div>

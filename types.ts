@@ -1,4 +1,5 @@
 
+
 export interface User {
   name: string;
   email: string;
@@ -49,6 +50,7 @@ export interface Grade {
   assignmentTitle: string;
   score: number;
   maxScore: number;
+  studentName?: string;
 }
 
 export interface CalendarEvent {

@@ -516,46 +516,116 @@ export const RAW_DATA = {
 ],
 "Notas":[
  {
-  " id": "P2",
+  "id": "OTS110-EX-CPO",
   "curso_id": "OTS110",
-  "titulo_asignacion ": "Ensayo sobre Génesis a Levítico",
-  "puntuacion": 0,
-  "puntuacion_maxima": 100
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 90,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Carla Pérez de Ontiveros"
  },
  {
-  " id": "P2",
+  "id": "OTS110-EX-SON",
   "curso_id": "OTS110",
-  "titulo_asignacion ": "Examen final",
-  "puntuacion": 0,
-  "puntuacion_maxima": 100
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 95,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Sandro Jose Ontiveros Noguera"
  },
  {
-  " id": "E1",
+  "id": "OTS110-EX-NP",
+  "curso_id": "OTS110",
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 95,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Nayalex Parra"
+ },
+ {
+  "id": "OTS110-EX-JSC",
+  "curso_id": "OTS110",
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 95,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Jesús Abraham Salazar Caraballo"
+ },
+ {
+  "id": "OTS110-EX-LOS",
+  "curso_id": "OTS110",
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 93,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Liryde Yobersy Ochoa sanchez"
+ },
+ {
+  "id": "OTS110-EX-ALG",
+  "curso_id": "OTS110",
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 95,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Alirio José León González"
+ },
+ {
+  "id": "OTS110-EX-HNV",
+  "curso_id": "OTS110",
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 100,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Hadasa Jired Navarro Vidales"
+ },
+ {
+  "id": "OTS110-EX-MAQ",
+  "curso_id": "OTS110",
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 92,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Julio Miguel Aponte Quintero"
+ },
+ {
+  "id": "OTS110-EX-AVL",
+  "curso_id": "OTS110",
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 100,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Ahiram Gabriel Velasco Lamoth"
+ },
+ {
+  "id": "OTS110-EX-JCU",
+  "curso_id": "OTS110",
+  "titulo_asignacion": "Examen final",
+  "puntuacion": 90,
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Jhonman Rafael cuberos urbano"
+ },
+ {
+  "id": "NTS110-E1",
   "curso_id": "NTS110",
-  "titulo_asignacion ": "Ensayo sobre Génesis a Levítico",
+  "titulo_asignacion": "Análisis de Marcos",
   "puntuacion": 0,
-  "puntuacion_maxima": 100
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Alanny Garcia"
  },
  {
-  " id": "E2",
+  "id": "NTS110-E2",
   "curso_id": "NTS110",
-  "titulo_asignacion ": "Examen final",
+  "titulo_asignacion": "Examen final de Evangelios",
   "puntuacion": 0,
-  "puntuacion_maxima": 100
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Alanny Garcia"
  },
  {
-  " id": "E1",
+  "id": "EDU101-E1",
   "curso_id": "EDU101",
-  "titulo_asignacion ": "Ensayo sobre Génesis a Levítico",
+  "titulo_asignacion": "Ensayo: Fundamentos de Ed. Cristiana",
   "puntuacion": 0,
-  "puntuacion_maxima": 100
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Alanny Garcia"
  },
  {
-  " id": "E2",
+  "id": "EDU101-E2",
   "curso_id": "EDU101",
-  "titulo_asignacion ": "Examen final",
+  "titulo_asignacion": "Examen final de Introducción",
   "puntuacion": 0,
-  "puntuacion_maxima": 100
+  "puntuacion_maxima": 100,
+  "nombre_estudiante": "Alanny Garcia"
  }
 ],
 "Mensajes":[

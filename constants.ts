@@ -85,6 +85,7 @@ export const MOCK_GRADES: Grade[] = rawGrades.map((g: any, index: number) => ({
     assignmentTitle: g.titulo_asignacion,
     score: g.puntuacion,
     maxScore: g.puntuacion_maxima,
+    studentName: g.nombre_estudiante,
 }));
 
 export const MOCK_MESSAGES: Message[] = rawMessages.map((m: any, index: number) => ({

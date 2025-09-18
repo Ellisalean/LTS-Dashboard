@@ -27,7 +27,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             case View.Exams:
                 return <Exams />;
             case View.Grades:
-                return <Grades />;
+                return <Grades user={user} />;
             default:
                 return <Home user={user} />;
         }
