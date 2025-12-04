@@ -5,7 +5,7 @@ export const RAW_DATA = {
   "ESTUDIANTE": "Alanny Garcia",
   "Contraseña": "G@rcia2024!\n\n",
   "Matrícula": "9/27/2024",
-  "Activo": "NO"
+  "Activo": "SI"
  },
  {
   "ESTUDIANTE": "Ahiram Gabriel Velasco Lamoth",
@@ -74,7 +74,7 @@ export const RAW_DATA = {
   "ESTUDIANTE": "José Rafael Cassiani Trigo",
   "Contraseña": "C4ssianiT$24",
   "Matrícula": "9/27/2024",
-  "Activo": "NO"
+  "Activo": "SI"
  },
  {
   "ESTUDIANTE": "Julio Miguel Aponte Quintero",
@@ -101,20 +101,20 @@ export const RAW_DATA = {
   "Email": "airamdjls@gmail.com",
   "Contraseña": "M3jias#2024",
   "Matrícula": "9/27/2024",
-  "Activo": "NO"
+  "Activo": "SI"
  },
  {
   "ESTUDIANTE": "Maria Benita Otalbora Perez",
   "Email": "mariaotalbora496@gmail.com",
   "Contraseña": "0talb0r4P%24",
   "Matrícula": "9/27/2024",
-  "Activo": "NO"
+  "Activo": "SI"
  },
  {
   "ESTUDIANTE": "Mery Martinez",
   "Contraseña": "M4rtinez!24",
   "Matrícula": "9/27/2024",
-  "Activo": "NO"
+  "Activo": "SI"
  },
  {
   "ESTUDIANTE": "Nayalex Parra",
@@ -140,13 +140,13 @@ export const RAW_DATA = {
   "ESTUDIANTE": "Victor Aponte",
   "Contraseña": "Ap0nteV$2024",
   "Matrícula": "9/27/2024",
-  "Activo": "NO"
+  "Activo": "SI"
  },
  {
   "ESTUDIANTE": "Yessica Ochoa",
   "Contraseña": "0choaY*2024",
   "Matrícula": "9/27/2024",
-  "Activo": "NO"
+  "Activo": "SI"
  }
 ],
 "Cursos":[

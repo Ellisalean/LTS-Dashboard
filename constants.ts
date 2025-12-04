@@ -65,6 +65,7 @@ const formatDate = (dateStr: string) => {
 
 export const MOCK_ASSIGNMENTS: Assignment[] = rawAssignments.map((a: any, index: number) => ({
     id: `${a.id || 'assign'}-${a.curso_id}-${index}`, // Ensure unique ID
+    courseId: a.curso_id,
     course: courseIdToNameMap[a.curso_id] || 'Curso Desconocido',
     title: a.titulo,
     dueDate: formatDate(a.fecha_entrega),
@@ -73,6 +74,7 @@ export const MOCK_ASSIGNMENTS: Assignment[] = rawAssignments.map((a: any, index:
 
 export const MOCK_EXAMS: Exam[] = rawExams.map((e: any, index: number) => ({
     id: `${e.id || 'exam'}-${e.curso_id}-${index}`, // Ensure unique ID
+    courseId: e.curso_id,
     course: courseIdToNameMap[e.curso_id] || 'Curso Desconocido',
     title: e.titulo,
     date: formatDate(e.fecha),
@@ -81,6 +83,7 @@ export const MOCK_EXAMS: Exam[] = rawExams.map((e: any, index: number) => ({
 
 export const MOCK_GRADES: Grade[] = rawGrades.map((g: any, index: number) => ({
     id: `${g.id || 'grade'}-${g.curso_id}-${g.titulo_asignacion}-${index}`, // Ensure unique ID
+    courseId: g.curso_id,
     course: courseIdToNameMap[g.curso_id] || 'Curso Desconocido',
     assignmentTitle: g.titulo_asignacion,
     score: g.puntuacion,

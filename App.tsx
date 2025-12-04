@@ -2,32 +2,44 @@ import React, { useState, useCallback } from 'react';
 import Login from './components/Login.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import { User } from './types.ts';
+import { supabase } from './application/supabase.ts';
 
 const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
 
     const handleLogin = useCallback(async (username: string, password: string): Promise<boolean> => {
         try {
-            const response = await fetch('/.netlify/functions/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password }),
-            });
+            // Consulta directa a Supabase (Table Login)
+            const { data: student, error } = await supabase
+                .from('estudiantes')
+                .select('*')
+                .eq('nombre', username.trim())
+                .single();
 
-            if (response.ok) {
-                const userData: User = await response.json();
-                setUser(userData);
+            if (error || !student) {
+                console.error("User not found or DB error", error);
+                return false;
+            }
+
+            // Validar contraseña (texto plano como en tus datos)
+            const storedPass = String(student.password || '').trim();
+            const inputPass = password.trim();
+
+            if (student.activo && storedPass === inputPass) {
+                const userPayload: User = {
+                    name: student.nombre,
+                    email: student.email || 'No disponible',
+                    avatarUrl: student.avatar_url || `https://i.pravatar.cc/150?u=${encodeURIComponent(student.nombre)}`,
+                    role: student.rol === 'admin' ? 'admin' : 'estudiante'
+                };
+                setUser(userPayload);
                 return true;
             }
-            
-            return false;
-
-        } catch (error) {
-            console.error("Error connecting to login service:", error);
-            return false;
+        } catch (err) {
+            console.error("Login error:", err);
         }
+            
+        return false;
     }, []);
 
     const handleLogout = useCallback(() => {

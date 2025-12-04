@@ -1,6 +1,5 @@
 import React from 'react';
 import { Assignment } from '../../types.ts';
-import { MOCK_ASSIGNMENTS } from '../../constants.ts';
 import { ClipboardListIcon, CheckCircleIcon, ClockIcon } from '../Icons.tsx';
 
 const AssignmentItem: React.FC<{ assignment: Assignment }> = ({ assignment }) => (
@@ -30,10 +29,13 @@ const AssignmentItem: React.FC<{ assignment: Assignment }> = ({ assignment }) =>
     </li>
 );
 
+interface AssignmentsProps {
+    assignments: Assignment[];
+}
 
-const Assignments: React.FC = () => {
-    const pendingAssignments = MOCK_ASSIGNMENTS.filter(a => !a.isSubmitted);
-    const submittedAssignments = MOCK_ASSIGNMENTS.filter(a => a.isSubmitted);
+const Assignments: React.FC<AssignmentsProps> = ({ assignments }) => {
+    const pendingAssignments = assignments.filter(a => !a.isSubmitted);
+    const submittedAssignments = assignments.filter(a => a.isSubmitted);
 
     return (
         <div>

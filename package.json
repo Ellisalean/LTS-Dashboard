@@ -9,9 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "^19.1.0",
-    "react": "^19.1.0",
-    "@netlify/functions": "^4.1.11"
+    "react-dom": "^19.2.0",
+    "react": "18.2.0",
+    "@netlify/functions": "^4.1.11",
+    "@supabase/supabase-js": "2.39.0",
+    "jspdf": "2.5.1",
+    "jspdf-autotable": "3.5.29"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

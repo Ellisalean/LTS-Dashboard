@@ -1,6 +1,5 @@
 import React from 'react';
 import { Grade, User } from '../../types.ts';
-import { MOCK_GRADES } from '../../constants.ts';
 import { ChartBarIcon } from '../Icons.tsx';
 
 const getGradeColor = (score: number, maxScore: number) => {
@@ -13,11 +12,10 @@ const getGradeColor = (score: number, maxScore: number) => {
 
 interface GradesProps {
     user: User;
+    grades: Grade[];
 }
 
-const Grades: React.FC<GradesProps> = ({ user }) => {
-    const userGrades = MOCK_GRADES.filter(grade => grade.studentName === user.name);
-
+const Grades: React.FC<GradesProps> = ({ user, grades }) => {
     return (
         <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
@@ -43,8 +41,8 @@ const Grades: React.FC<GradesProps> = ({ user }) => {
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {userGrades.length > 0 ? (
-                            userGrades.map((grade) => (
+                        {grades.length > 0 ? (
+                            grades.map((grade) => (
                                 <tr key={grade.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{grade.course}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{grade.assignmentTitle}</td>

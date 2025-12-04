@@ -1,6 +1,5 @@
 import React from 'react';
 import { Exam } from '../../types.ts';
-import { MOCK_EXAMS } from '../../constants.ts';
 import { AcademicCapIcon, CalendarIcon } from '../Icons.tsx';
 
 const ExamCard: React.FC<{ exam: Exam }> = ({ exam }) => (
@@ -22,8 +21,11 @@ const ExamCard: React.FC<{ exam: Exam }> = ({ exam }) => (
     </div>
 );
 
+interface ExamsProps {
+    exams: Exam[];
+}
 
-const Exams: React.FC = () => {
+const Exams: React.FC<ExamsProps> = ({ exams }) => {
     return (
         <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
@@ -31,8 +33,8 @@ const Exams: React.FC = () => {
                 Próximos Exámenes
             </h1>
             <div className="space-y-4">
-                {MOCK_EXAMS.length > 0 ? (
-                    MOCK_EXAMS.map(exam => <ExamCard key={exam.id} exam={exam} />)
+                {exams.length > 0 ? (
+                    exams.map(exam => <ExamCard key={exam.id} exam={exam} />)
                 ) : (
                     <p className="text-gray-500 dark:text-gray-400">No hay exámenes programados.</p>
                 )}

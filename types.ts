@@ -4,6 +4,7 @@ export interface User {
   name: string;
   email: string;
   avatarUrl: string;
+  role?: 'admin' | 'estudiante';
 }
 
 export interface Student {
@@ -30,6 +31,7 @@ export interface Course {
 
 export interface Assignment {
   id: string;
+  courseId: string;
   course: string;
   title: string;
   dueDate: string;
@@ -38,6 +40,7 @@ export interface Assignment {
 
 export interface Exam {
   id: string;
+  courseId: string;
   course: string;
   title: string;
   date: string;
@@ -46,6 +49,7 @@ export interface Exam {
 
 export interface Grade {
   id: string;
+  courseId: string;
   course: string;
   assignmentTitle: string;
   score: number;
@@ -68,10 +72,20 @@ export interface Message {
   timestamp: string;
 }
 
+export interface Attendance {
+    id: string;
+    date: string;
+    courseId: string;
+    status: 'presente' | 'ausente' | 'justificado';
+}
+
 export enum View {
   Home = 'Inicio',
   Courses = 'Cursos',
   Assignments = 'Asignaciones',
   Exams = 'Exámenes',
   Grades = 'Notas',
+  Attendance = 'Asistencia',
+  Chat = 'Mensajería',
+  TeacherPanel = 'Panel Profesor'
 }

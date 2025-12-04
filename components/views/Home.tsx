@@ -1,10 +1,11 @@
 import React from 'react';
 import { User, CalendarEvent, Message } from '../../types.ts';
-import { MOCK_CALENDAR_EVENTS, MOCK_MESSAGES } from '../../constants.ts';
 import { CalendarIcon, MailIcon, ClockIcon } from '../Icons.tsx';
 
 interface HomeProps {
     user: User;
+    events: CalendarEvent[];
+    messages: Message[];
 }
 
 const WelcomeHeader: React.FC<{ user: User }> = ({ user }) => (
@@ -20,10 +21,13 @@ const WelcomeHeader: React.FC<{ user: User }> = ({ user }) => (
 const CalendarWidget: React.FC<{ events: CalendarEvent[] }> = ({ events }) => {
     const getMonthAbbreviation = (dateStr: string) => {
         const date = new Date(dateStr);
+        // Validar fecha
+        if(isNaN(date.getTime())) return 'N/A';
         return date.toLocaleString('es-ES', { month: 'short', timeZone: 'UTC' }).toUpperCase().replace('.', '');
     }
     const getDay = (dateStr: string) => {
          const date = new Date(dateStr);
+         if(isNaN(date.getTime())) return '-';
          return date.getUTCDate();
     }
 
@@ -69,13 +73,13 @@ const MessagesWidget: React.FC<{ messages: Message[] }> = ({ messages }) => (
 );
 
 
-const Home: React.FC<HomeProps> = ({ user }) => {
+const Home: React.FC<HomeProps> = ({ user, events, messages }) => {
     return (
         <div className="space-y-8">
             <WelcomeHeader user={user} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <CalendarWidget events={MOCK_CALENDAR_EVENTS} />
-                <MessagesWidget messages={MOCK_MESSAGES} />
+                <CalendarWidget events={events} />
+                <MessagesWidget messages={messages} />
             </div>
         </div>
     );
