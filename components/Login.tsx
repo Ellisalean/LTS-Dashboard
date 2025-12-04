@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { LogoIcon } from './Icons.tsx';
+import { SCHOOL_LOGO_URL } from '../constants.ts';
 import { migrateDataToSupabase } from '../application/migration.ts';
 
 interface LoginProps {
@@ -115,8 +114,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
             <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl z-10">
                 <div className="text-center">
-                    <div className="flex justify-center mx-auto text-blue-600 dark:text-blue-400">
-                      <LogoIcon className="h-12 w-12"/>
+                    <div className="flex justify-center mx-auto mb-4">
+                      <img 
+                        src={SCHOOL_LOGO_URL} 
+                        alt="LTS Logo" 
+                        className="h-24 w-auto object-contain drop-shadow-md"
+                      />
                     </div>
                     <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                         Latin Theological Seminary

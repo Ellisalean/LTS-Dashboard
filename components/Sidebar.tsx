@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from '../types.ts';
-import { HomeIcon, BookOpenIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon, LogoIcon, UserGroupIcon, CheckIcon, ChatIcon } from './Icons.tsx';
+import { SCHOOL_LOGO_URL } from '../constants.ts';
+import { HomeIcon, BookOpenIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon, UserGroupIcon, CheckIcon, ChatIcon } from './Icons.tsx';
 
 interface SidebarProps {
     activeView: View;
@@ -21,8 +22,12 @@ const navItems = [
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, userRole }) => {
     return (
         <div className="flex flex-col w-64 bg-white dark:bg-gray-800 shadow-xl transition-all duration-300">
-            <div className="flex items-center justify-center h-20 border-b dark:border-gray-700">
-                <LogoIcon className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-center justify-center h-20 border-b dark:border-gray-700 py-2">
+                <img 
+                    src={SCHOOL_LOGO_URL} 
+                    alt="LTS Logo" 
+                    className="h-12 w-auto object-contain"
+                />
                 <span className="ml-3 text-xl font-bold text-gray-800 dark:text-white">LTS</span>
             </div>
             <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
