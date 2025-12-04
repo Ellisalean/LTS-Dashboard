@@ -18,7 +18,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
         const threeDaysFromNow = new Date();
         threeDaysFromNow.setDate(today.getDate() + 3);
 
-        const alerts = [];
+        const alerts: any[] = [];
 
         // 1. Asignaciones próximas
         const upcomingAssignments = assignments.filter(a => {

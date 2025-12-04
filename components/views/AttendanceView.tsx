@@ -29,8 +29,8 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
                     setRecords(attendanceData);
                     
                     // Calcular estadísticas
-                    const present = attendanceData.filter(r => r.estado === 'presente').length;
-                    const absent = attendanceData.filter(r => r.estado === 'ausente').length;
+                    const present = attendanceData.filter((r: any) => r.estado === 'presente').length;
+                    const absent = attendanceData.filter((r: any) => r.estado === 'ausente').length;
                     setStats({ present, absent });
                 }
             }
