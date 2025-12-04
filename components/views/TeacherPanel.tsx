@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../application/supabase.ts';
-import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon } from '../Icons.tsx';
+import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon } from '../Icons.tsx';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
 // @ts-ignore
@@ -38,6 +38,13 @@ interface ExamData {
     hora: string;
 }
 
+interface AnnouncementData {
+    id: string;
+    remitente: string;
+    asunto: string;
+    fecha_envio: string;
+}
+
 // Helper para convertir URL de imagen a Base64 para el PDF
 const getImageData = (url: string): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -68,7 +75,7 @@ const LOGO_URL = "https://cdn.myportfolio.com/d435fa58-d32c-4141-8a15-0f2bfccdea
 
 const TeacherPanel: React.FC = () => {
     // ESTADO GENERAL
-    const [activeTab, setActiveTab] = useState<'students' | 'assignments' | 'exams' | 'attendance'>('students');
+    const [activeTab, setActiveTab] = useState<'students' | 'assignments' | 'exams' | 'attendance' | 'announcements'>('students');
     const [coursesList, setCoursesList] = useState<{id: string, nombre: string}[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -110,7 +117,13 @@ const TeacherPanel: React.FC = () => {
     // --- ESTADO ASISTENCIA ---
     const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
     const [attendanceCourse, setAttendanceCourse] = useState('');
-    const [attendanceList, setAttendanceList] = useState<Record<string, string>>({}); // {studentId: 'presente'}
+    const [attendanceList, setAttendanceList] = useState<Record<string, string>>({});
+
+    // --- ESTADO ANUNCIOS ---
+    const [announcements, setAnnouncements] = useState<AnnouncementData[]>([]);
+    const [newAnnounceSender, setNewAnnounceSender] = useState('Dirección Académica');
+    const [newAnnounceContent, setNewAnnounceContent] = useState('');
+    const [confirmDeleteAnnounceId, setConfirmDeleteAnnounceId] = useState<string | null>(null);
 
     // CARGA INICIAL
     useEffect(() => {
@@ -126,6 +139,7 @@ const TeacherPanel: React.FC = () => {
     useEffect(() => {
         if (activeTab === 'assignments') fetchAssignments();
         if (activeTab === 'exams') fetchExams();
+        if (activeTab === 'announcements') fetchAnnouncements();
     }, [activeTab]);
 
     // --- FETCHERS ---
@@ -147,6 +161,11 @@ const TeacherPanel: React.FC = () => {
     const fetchExams = async () => {
         const { data } = await supabase.from('examenes').select('*').order('fecha', { ascending: false });
         if (data) setExams(data);
+    };
+
+    const fetchAnnouncements = async () => {
+        const { data } = await supabase.from('mensajes').select('*').order('fecha_envio', { ascending: false });
+        if (data) setAnnouncements(data);
     };
 
     const fetchStudentGrades = async (studentId: string) => {
@@ -262,7 +281,6 @@ const TeacherPanel: React.FC = () => {
 
             // Insertar Logo (X, Y, Ancho, Alto)
             if (logoBase64) {
-                // Ajustar proporciones si es necesario, aquí usamos un cuadrado de 20x20 aprox
                 doc.addImage(logoBase64, 'PNG', 14, 12, 20, 20);
             } else {
                 // Fallback si falla la imagen
@@ -341,14 +359,13 @@ const TeacherPanel: React.FC = () => {
     const handleLoadAttendance = async () => {
         if (!attendanceCourse || !attendanceDate) return;
         
-        // Cargar registros existentes
         const { data } = await supabase.from('asistencias')
             .select('estudiante_id, estado')
             .eq('curso_id', attendanceCourse)
             .eq('fecha', attendanceDate);
             
         const currentStatus: Record<string, string> = {};
-        students.forEach(s => currentStatus[s.id] = 'ausente'); // Default
+        students.forEach(s => currentStatus[s.id] = 'ausente'); 
         
         if (data) {
             data.forEach((r: any) => {
@@ -359,10 +376,8 @@ const TeacherPanel: React.FC = () => {
     };
 
     const handleMarkAttendance = async (studentId: string, status: string) => {
-        // Actualizar estado local
         setAttendanceList(prev => ({ ...prev, [studentId]: status }));
 
-        // Upsert en DB
         const { data: existing } = await supabase.from('asistencias')
             .select('id')
             .eq('estudiante_id', studentId)
@@ -382,7 +397,7 @@ const TeacherPanel: React.FC = () => {
         }
     };
 
-    // --- HANDLERS ASIGNACIONES & EXAMENES (Sin cambios importantes, solo contexto) ---
+    // --- HANDLERS ASIGNACIONES & EXAMENES ---
     const handleAddAssignment = async () => {
         if (!newAssignCourse || !newAssignTitle) return;
         const { error } = await supabase.from('asignaciones').insert({
@@ -411,6 +426,29 @@ const TeacherPanel: React.FC = () => {
         if (!error) { fetchExams(); setConfirmDeleteExamId(null); }
     };
 
+    // --- HANDLERS ANUNCIOS ---
+    const handleAddAnnouncement = async () => {
+        if (!newAnnounceContent) return;
+        const { error } = await supabase.from('mensajes').insert({
+            remitente: newAnnounceSender || 'Dirección',
+            asunto: newAnnounceContent,
+            leido: false,
+            fecha_envio: new Date().toISOString()
+        });
+        if (!error) { 
+            setNewAnnounceContent(''); 
+            fetchAnnouncements(); 
+        }
+    };
+
+    const handleDeleteAnnouncement = async (id: string) => {
+        const { error } = await supabase.from('mensajes').delete().eq('id', id);
+        if (!error) {
+            fetchAnnouncements();
+            setConfirmDeleteAnnounceId(null);
+        }
+    };
+
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando panel de administración...</div>;
 
@@ -418,6 +456,7 @@ const TeacherPanel: React.FC = () => {
 
     // 1. VISTA DE DETALLE ESTUDIANTE (Sub-view)
     if (selectedStudent && activeTab === 'students') {
+        // ... (Mismo código de detalle estudiante) ...
         return (
             <div className="space-y-6 animate-fade-in">
                 <div className="flex justify-between items-center mb-4">
@@ -497,6 +536,7 @@ const TeacherPanel: React.FC = () => {
                 <button onClick={() => setActiveTab('assignments')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'assignments' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asignaciones</button>
                 <button onClick={() => setActiveTab('exams')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'exams' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Exámenes</button>
                 <button onClick={() => setActiveTab('attendance')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'attendance' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asistencia</button>
+                <button onClick={() => setActiveTab('announcements')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Anuncios</button>
             </div>
 
             {/* TAB CONTENT: STUDENTS */}
@@ -633,7 +673,7 @@ const TeacherPanel: React.FC = () => {
                 </div>
             )}
 
-            {/* TAB CONTENT: ASSIGNMENTS (Reuse existing) */}
+            {/* TAB CONTENT: ASSIGNMENTS */}
             {activeTab === 'assignments' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
@@ -682,7 +722,7 @@ const TeacherPanel: React.FC = () => {
                 </div>
             )}
 
-            {/* TAB CONTENT: EXAMS (Reuse existing) */}
+            {/* TAB CONTENT: EXAMS */}
             {activeTab === 'exams' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
@@ -732,6 +772,70 @@ const TeacherPanel: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB CONTENT: ANNOUNCEMENTS (Mensajes Globales) */}
+            {activeTab === 'announcements' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Formulario */}
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
+                        <h2 className="text-lg font-bold mb-4 flex items-center text-gray-800 dark:text-white"><MailIcon className="h-5 w-5 mr-2 text-blue-500"/>Nuevo Anuncio</h2>
+                        <div className="space-y-3">
+                            <input 
+                                type="text" 
+                                placeholder="Remitente (Ej: Dirección)" 
+                                value={newAnnounceSender} 
+                                onChange={(e) => setNewAnnounceSender(e.target.value)} 
+                                className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white" 
+                            />
+                            <textarea 
+                                placeholder="Escribe el mensaje o anuncio aquí..." 
+                                value={newAnnounceContent} 
+                                onChange={(e) => setNewAnnounceContent(e.target.value)} 
+                                className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white h-32"
+                            />
+                            <button 
+                                onClick={handleAddAnnouncement} 
+                                disabled={!newAnnounceContent} 
+                                className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 font-bold"
+                            >
+                                Publicar Anuncio
+                            </button>
+                        </div>
+                    </div>
+                    {/* Lista */}
+                    <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                        <div className="px-6 py-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                            <h3 className="font-bold text-gray-700 dark:text-gray-200">Anuncios Publicados (Visibles en Home)</h3>
+                        </div>
+                        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                            {announcements.map(msg => (
+                                <div key={msg.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex justify-between items-start">
+                                    <div>
+                                        <p className="font-semibold text-gray-900 dark:text-white">{msg.asunto}</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">De: <span className="font-medium">{msg.remitente}</span></p>
+                                        <p className="text-xs text-gray-400 mt-1">{new Date(msg.fecha_envio).toLocaleDateString()} {new Date(msg.fecha_envio).toLocaleTimeString()}</p>
+                                    </div>
+                                    <div className="ml-4">
+                                        {confirmDeleteAnnounceId === msg.id ? (
+                                            <div className="flex space-x-2">
+                                                <button onClick={() => handleDeleteAnnouncement(msg.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded">Borrar</button>
+                                                <button onClick={() => setConfirmDeleteAnnounceId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded">X</button>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => setConfirmDeleteAnnounceId(msg.id)} className="text-gray-400 hover:text-red-500 p-1">
+                                                <TrashIcon className="h-5 w-5"/>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {announcements.length === 0 && (
+                                <div className="p-8 text-center text-gray-500">No hay anuncios publicados.</div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
