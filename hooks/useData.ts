@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect } from 'react';
 import { supabase } from '../application/supabase.ts';
 import { Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus, User } from '../types.ts';
@@ -12,6 +11,7 @@ interface DataState {
     messages: Message[];
     calendarEvents: CalendarEvent[];
     loading: boolean;
+    unreadChatCount: number; // Nuevo campo
 }
 
 export const useRealtimeData = (user: User | null) => {
@@ -22,7 +22,8 @@ export const useRealtimeData = (user: User | null) => {
         grades: [],
         messages: [],
         calendarEvents: [],
-        loading: true
+        loading: true,
+        unreadChatCount: 0
     });
 
     useEffect(() => {
@@ -50,14 +51,22 @@ export const useRealtimeData = (user: User | null) => {
                     return acc;
                 }, {});
 
+                // Obtener asistencias para activar cursos "En Curso"
+                let dbAttendance: any[] = [];
+                if (userId) {
+                    const { data } = await supabase.from('asistencias').select('curso_id').eq('estudiante_id', userId);
+                    dbAttendance = data || [];
+                }
+                const attendedCourseIds = new Set(dbAttendance.map(a => a.curso_id));
+
                 const courses: Course[] = (dbCourses || []).map((c: any) => {
                     // LÓGICA INTELIGENTE DE ESTADO
                     const myGradesInThisCourse = dbGrades.filter((g: any) => g.curso_id === c.id);
                     
                     let computedStatus = CourseStatus.NoIniciado;
 
-                    if (myGradesInThisCourse.length > 0) {
-                        // Si tiene notas, al menos está en curso
+                    // Si tiene notas O tiene asistencia registrada, está en curso
+                    if (myGradesInThisCourse.length > 0 || attendedCourseIds.has(c.id)) {
                         computedStatus = CourseStatus.EnCurso;
 
                         // Verificar si ya terminó (Si tiene una nota con título "Final", "Definitiva", etc.)
@@ -115,7 +124,7 @@ export const useRealtimeData = (user: User | null) => {
                     studentName: user.name
                 }));
 
-                // 7. Mensajes
+                // 7. Mensajes (Anuncios)
                 const { data: dbMsgs } = await supabase.from('mensajes').select('*').order('fecha_envio', { ascending: false });
                 const messages: Message[] = (dbMsgs || []).map((m: any) => ({
                     id: m.id,
@@ -125,7 +134,18 @@ export const useRealtimeData = (user: User | null) => {
                     timestamp: new Date(m.fecha_envio).toLocaleDateString()
                 }));
 
-                // 8. Calendario
+                // 8. CHAT: Contar mensajes no leídos
+                let unreadChatCount = 0;
+                if (userId) {
+                    const { count } = await supabase
+                        .from('chat_mensajes')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('receiver_id', userId)
+                        .eq('leido', false);
+                    unreadChatCount = count || 0;
+                }
+
+                // 9. Calendario
                 const assignmentEvents: CalendarEvent[] = assignments.map(a => ({
                     id: `assign-${a.id}`,
                     title: `Entrega: ${a.title}`,
@@ -155,7 +175,8 @@ export const useRealtimeData = (user: User | null) => {
                         grades,
                         messages,
                         calendarEvents,
-                        loading: false
+                        loading: false,
+                        unreadChatCount
                     });
                 }
 

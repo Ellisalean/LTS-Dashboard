@@ -1,15 +1,17 @@
+
 import React, { useState, useMemo } from 'react';
 import { User, Assignment, Exam } from '../types.ts';
-import { LogoutIcon, BellIcon, ClockIcon, AcademicCapIcon } from './Icons.tsx';
+import { LogoutIcon, BellIcon, ClockIcon, AcademicCapIcon, ChatIcon } from './Icons.tsx';
 
 interface HeaderProps {
     user: User;
     onLogout: () => void;
     assignments?: Assignment[];
     exams?: Exam[];
+    unreadChatCount?: number;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams = [] }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams = [], unreadChatCount = 0 }) => {
     const [showNotifications, setShowNotifications] = useState(false);
 
     // Lógica para generar notificaciones inteligentes
@@ -19,6 +21,16 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
         threeDaysFromNow.setDate(today.getDate() + 3);
 
         const alerts: any[] = [];
+
+        // 0. Mensajes de Chat
+        if (unreadChatCount > 0) {
+            alerts.push({
+                id: 'chat-alert',
+                title: 'Nuevos Mensajes',
+                msg: `Tienes ${unreadChatCount} mensajes sin leer en el chat.`,
+                type: 'info'
+            });
+        }
 
         // 1. Asignaciones próximas
         const upcomingAssignments = assignments.filter(a => {
@@ -51,7 +63,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
         });
 
         return alerts;
-    }, [assignments, exams]);
+    }, [assignments, exams, unreadChatCount]);
 
     return (
         <header className="flex items-center justify-end h-20 px-6 bg-white dark:bg-gray-800 border-b dark:border-gray-700 relative z-20">
@@ -80,8 +92,8 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
                                     notifications.map(n => (
                                         <div key={n.id} className="p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                             <div className="flex items-start">
-                                                <div className={`mt-1 p-1 rounded-full ${n.type === 'danger' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                                                    {n.type === 'danger' ? <AcademicCapIcon className="h-4 w-4"/> : <ClockIcon className="h-4 w-4"/>}
+                                                <div className={`mt-1 p-1 rounded-full ${n.type === 'danger' ? 'bg-red-100 text-red-600' : n.type === 'info' ? 'bg-blue-100 text-blue-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                                                    {n.type === 'danger' ? <AcademicCapIcon className="h-4 w-4"/> : n.type === 'info' ? <ChatIcon className="h-4 w-4"/> : <ClockIcon className="h-4 w-4"/>}
                                                 </div>
                                                 <div className="ml-3">
                                                     <p className="text-sm font-semibold text-gray-800 dark:text-white">{n.title}</p>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../../types.ts';
 import { supabase } from '../../application/supabase.ts';
@@ -72,7 +73,7 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
             
             if (data) setMessages(data);
             
-            // Marcar como leídos
+            // Marcar como leídos INMEDIATAMENTE
             await supabase.from('chat_mensajes')
                 .update({ leido: true })
                 .eq('receiver_id', currentUserId)
@@ -84,7 +85,7 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
 
         // Suscripción Realtime
         const channel = supabase.channel('chat-room')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensajes' }, (payload) => {
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensajes' }, async (payload) => {
                 const msg = payload.new as ChatMessage;
                 // Si el mensaje pertenece a esta conversación
                 if (
@@ -94,6 +95,13 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
                     setMessages(prev => [...prev, msg]);
                     // Auto scroll
                     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+
+                    // Si recibí el mensaje y tengo el chat abierto, marcarlo como leído al vuelo
+                    if (msg.receiver_id === currentUserId) {
+                         await supabase.from('chat_mensajes')
+                            .update({ leido: true })
+                            .eq('id', msg.id);
+                    }
                 }
             })
             .subscribe();

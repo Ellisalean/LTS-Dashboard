@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User, View } from '../types.ts';
 import Sidebar from './Sidebar.tsx';
@@ -21,7 +22,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     const [activeView, setActiveView] = useState<View>(View.Home);
     
     // Obtener datos en tiempo real de Supabase
-    const { courses, assignments, exams, grades, messages, calendarEvents, loading } = useRealtimeData(user);
+    const { courses, assignments, exams, grades, messages, calendarEvents, loading, unreadChatCount } = useRealtimeData(user);
 
     if (loading) {
         return (
@@ -57,13 +58,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
     return (
         <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
-            <Sidebar activeView={activeView} setActiveView={setActiveView} userRole={user.role} />
+            <Sidebar 
+                activeView={activeView} 
+                setActiveView={setActiveView} 
+                userRole={user.role} 
+                unreadChatCount={unreadChatCount} // Pass count to sidebar
+            />
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header 
                     user={user} 
                     onLogout={onLogout} 
-                    assignments={assignments} // Pasamos asignaciones para las notificaciones
-                    exams={exams}             // Pasamos exámenes para las notificaciones
+                    assignments={assignments} 
+                    exams={exams} 
+                    unreadChatCount={unreadChatCount} // Pass count to header
                 />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">
                     <div className="container mx-auto px-6 py-8">
