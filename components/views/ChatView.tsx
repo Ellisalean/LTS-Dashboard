@@ -13,7 +13,7 @@ interface ChatUser {
     nombre: string;
     avatar_url: string;
     rol: string;
-    unreadCount?: number;
+    unreadCount: number;
 }
 
 interface ChatMessage {
@@ -45,7 +45,7 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
         fetchMe();
     }, [user]);
 
-    // 2. Obtener lista de contactos según rol
+    // 2. Obtener lista de contactos y mensajes no leídos por usuario
     const fetchContacts = async (myRole: string, myId: string) => {
         let query = supabase.from('estudiantes').select('id, nombre, avatar_url, rol').neq('id', myId);
         
@@ -55,8 +55,34 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
         }
 
         const { data: users } = await query;
+        
         if (users) {
-            setContacts(users);
+            // Buscar mensajes NO leídos dirigidos a mí
+            const { data: unreadMsgs } = await supabase
+                .from('chat_mensajes')
+                .select('sender_id')
+                .eq('receiver_id', myId)
+                .eq('leido', false);
+
+            // Agrupar conteo por remitente
+            const counts: {[key: string]: number} = {};
+            unreadMsgs?.forEach((msg: any) => {
+                counts[msg.sender_id] = (counts[msg.sender_id] || 0) + 1;
+            });
+
+            // Mapear usuarios con su conteo
+            const mappedUsers = users.map((u: any) => ({
+                id: u.id,
+                nombre: u.nombre,
+                avatar_url: u.avatar_url,
+                rol: u.rol,
+                unreadCount: counts[u.id] || 0
+            }));
+
+            // Ordenar: Primero los que tienen mensajes no leídos
+            mappedUsers.sort((a, b) => b.unreadCount - a.unreadCount);
+
+            setContacts(mappedUsers);
         }
     };
 
@@ -73,12 +99,8 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
             
             if (data) setMessages(data);
             
-            // Marcar como leídos INMEDIATAMENTE
-            await supabase.from('chat_mensajes')
-                .update({ leido: true })
-                .eq('receiver_id', currentUserId)
-                .eq('sender_id', selectedUser.id)
-                .eq('leido', false);
+            // Marcar como leídos
+            await markAsRead(selectedUser.id);
         };
 
         fetchMessages();
@@ -87,21 +109,30 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
         const channel = supabase.channel('chat-room')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensajes' }, async (payload) => {
                 const msg = payload.new as ChatMessage;
-                // Si el mensaje pertenece a esta conversación
+                
+                // CASO A: Mensaje de la conversación actual abierta
                 if (
                     (msg.sender_id === currentUserId && msg.receiver_id === selectedUser.id) ||
                     (msg.sender_id === selectedUser.id && msg.receiver_id === currentUserId)
                 ) {
                     setMessages(prev => [...prev, msg]);
-                    // Auto scroll
                     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
 
-                    // Si recibí el mensaje y tengo el chat abierto, marcarlo como leído al vuelo
+                    // Si yo soy el receptor, marcar como leído al instante
                     if (msg.receiver_id === currentUserId) {
-                         await supabase.from('chat_mensajes')
-                            .update({ leido: true })
-                            .eq('id', msg.id);
+                         await markAsRead(msg.sender_id);
                     }
+                }
+
+                // CASO B: Mensaje de OTRA persona (Actualizar contadores en la lista lateral)
+                if (msg.receiver_id === currentUserId) {
+                    setContacts(prevContacts => prevContacts.map(c => {
+                        // Si es el remitente Y NO es el chat que tengo abierto ahora mismo
+                        if (c.id === msg.sender_id && c.id !== selectedUser.id) {
+                            return { ...c, unreadCount: c.unreadCount + 1 };
+                        }
+                        return c;
+                    }).sort((a, b) => b.unreadCount - a.unreadCount)); // Reordenar para que suba el contacto
                 }
             })
             .subscribe();
@@ -109,6 +140,19 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
         return () => { supabase.removeChannel(channel); };
 
     }, [selectedUser, currentUserId]);
+
+    const markAsRead = async (senderId: string) => {
+        if (!currentUserId) return;
+        
+        await supabase.from('chat_mensajes')
+            .update({ leido: true })
+            .eq('receiver_id', currentUserId)
+            .eq('sender_id', senderId)
+            .eq('leido', false);
+            
+        // Limpiar contador visualmente
+        setContacts(prev => prev.map(c => c.id === senderId ? { ...c, unreadCount: 0 } : c));
+    };
 
     // Scroll al fondo al cargar mensajes
     useEffect(() => {
@@ -131,6 +175,12 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
         }
     };
 
+    const handleSelectContact = (contact: ChatUser) => {
+        setSelectedUser(contact);
+        // Al hacer click, reseteamos su contador visualmente (la DB se actualiza en useEffect)
+        setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, unreadCount: 0 } : c));
+    }
+
     return (
         <div className="flex h-[calc(100vh-8rem)] bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border dark:border-gray-700">
             
@@ -146,12 +196,23 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
                     {contacts.map(contact => (
                         <div 
                             key={contact.id}
-                            onClick={() => setSelectedUser(contact)}
+                            onClick={() => handleSelectContact(contact)}
                             className={`flex items-center p-4 cursor-pointer hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors ${selectedUser?.id === contact.id ? 'bg-blue-100 dark:bg-gray-700 border-l-4 border-blue-500' : ''}`}
                         >
-                            <img src={contact.avatar_url} className="w-10 h-10 rounded-full object-cover" />
-                            <div className="ml-3 flex-1">
-                                <p className="font-semibold text-gray-800 dark:text-white text-sm">{contact.nombre}</p>
+                            <div className="relative">
+                                <img src={contact.avatar_url} className="w-10 h-10 rounded-full object-cover" />
+                                {contact.unreadCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold h-5 w-5 flex items-center justify-center rounded-full border-2 border-white dark:border-gray-800 shadow-sm animate-bounce">
+                                        {contact.unreadCount}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="ml-3 flex-1 overflow-hidden">
+                                <div className="flex justify-between items-center">
+                                    <p className={`text-sm truncate ${contact.unreadCount > 0 ? 'font-bold text-black dark:text-white' : 'font-semibold text-gray-800 dark:text-gray-200'}`}>
+                                        {contact.nombre}
+                                    </p>
+                                </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{contact.rol}</p>
                             </div>
                         </div>
