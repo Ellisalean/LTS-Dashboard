@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../application/supabase.ts';
-import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon } from '../Icons.tsx';
+import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon, HomeIcon } from '../Icons.tsx';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
 // @ts-ignore
 import autoTable from 'jspdf-autotable';
+import { User } from '../../types.ts';
 
 interface StudentData {
     id: string;
@@ -13,6 +14,8 @@ interface StudentData {
     email: string;
     avatar_url: string;
     activo: boolean;
+    rol: string;
+    password?: string;
 }
 
 interface GradeData {
@@ -83,7 +86,15 @@ const getImageData = (url: string): Promise<string> => {
 // URL DEL LOGO REAL
 const LOGO_URL = "https://cdn.myportfolio.com/d435fa58-d32c-4141-8a15-0f2bfccdea41/1ac05fb8-e508-4c03-b550-d2b907caadbd_rw_600.png?h=7572d326e4292f32557ac73606fd0ece";
 
-const TeacherPanel: React.FC = () => {
+interface TeacherPanelProps {
+    user: User;
+}
+
+const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
+    // --- CONTROL DE PERMISOS ---
+    const isSuperAdmin = user.role === 'admin';
+    const isTeacher = user.role === 'profesor';
+
     // ESTADO GENERAL
     const [activeTab, setActiveTab] = useState<'students' | 'assignments' | 'exams' | 'attendance' | 'announcements' | 'courses'>('students');
     const [coursesList, setCoursesList] = useState<{id: string, nombre: string}[]>([]);
@@ -92,16 +103,24 @@ const TeacherPanel: React.FC = () => {
     // --- ESTADO ESTUDIANTES ---
     const [students, setStudents] = useState<StudentData[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
+    
+    // Estados para Edición de Perfil
     const [editPhotoUrl, setEditPhotoUrl] = useState('');
+    const [editName, setEditName] = useState('');
+    const [editEmail, setEditEmail] = useState('');
+    const [editPassword, setEditPassword] = useState(''); 
+
     const [studentGrades, setStudentGrades] = useState<GradeData[]>([]);
     const [confirmDeleteStudentId, setConfirmDeleteStudentId] = useState<string | null>(null);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
     
-    // Crear Estudiante
+    // Crear Usuario (Estudiante o Profesor)
     const [isCreatingStudent, setIsCreatingStudent] = useState(false);
     const [newStudentName, setNewStudentName] = useState('');
     const [newStudentEmail, setNewStudentEmail] = useState('');
     const [newStudentPassword, setNewStudentPassword] = useState('');
+    const [newUserRole, setNewUserRole] = useState('estudiante'); // ESTADO PARA EL ROL
 
     // Formulario Notas
     const [newGradeCourse, setNewGradeCourse] = useState('');
@@ -147,25 +166,40 @@ const TeacherPanel: React.FC = () => {
             setLoading(false);
         };
         init();
-    }, []);
+    }, [user]);
 
     // CARGA DE DATOS SEGUN PESTAÑA
     useEffect(() => {
         if (activeTab === 'assignments') fetchAssignments();
         if (activeTab === 'exams') fetchExams();
-        if (activeTab === 'announcements') fetchAnnouncements();
+        if (activeTab === 'announcements' && isSuperAdmin) fetchAnnouncements();
         if (activeTab === 'courses') fetchAdminCourses();
     }, [activeTab]);
 
     // --- FETCHERS ---
     const fetchCourses = async () => {
-        const { data } = await supabase.from('cursos').select('id, nombre').order('nombre');
+        // FILTRO DE CURSOS SEGÚN ROL
+        let query = supabase.from('cursos').select('id, nombre, profesor').order('nombre');
+        
+        // Si es profesor, solo traemos SUS cursos
+        if (isTeacher) {
+            query = query.eq('profesor', user.name);
+        }
+
+        const { data } = await query;
         if (data) setCoursesList(data);
     };
 
     const fetchAdminCourses = async () => {
-        // ORDENADO POR ID para mantener coherencia del pensum (THE101, THE102...)
-        const { data } = await supabase.from('cursos').select('*').order('id', { ascending: true });
+        // ORDENADO POR ID
+        let query = supabase.from('cursos').select('*').order('id', { ascending: true });
+        
+        // Si es profesor, solo puede administrar SUS cursos
+        if (isTeacher) {
+            query = query.eq('profesor', user.name);
+        }
+
+        const { data } = await query;
         if (data) setAdminCourses(data);
     };
 
@@ -176,40 +210,70 @@ const TeacherPanel: React.FC = () => {
 
     const fetchAssignments = async () => {
         const { data } = await supabase.from('asignaciones').select('*').order('fecha_entrega', { ascending: false });
-        if (data) setAssignments(data);
+        if (data) {
+            if (isTeacher) {
+                const myCourseIds = coursesList.map(c => c.id);
+                setAssignments(data.filter((a: any) => myCourseIds.includes(a.curso_id)));
+            } else {
+                setAssignments(data);
+            }
+        }
     };
 
     const fetchExams = async () => {
         const { data } = await supabase.from('examenes').select('*').order('fecha', { ascending: false });
-        if (data) setExams(data);
+        if (data) {
+             if (isTeacher) {
+                const myCourseIds = coursesList.map(c => c.id);
+                setExams(data.filter((e: any) => myCourseIds.includes(e.curso_id)));
+            } else {
+                setExams(data);
+            }
+        }
     };
 
     const fetchAnnouncements = async () => {
+        if (!isSuperAdmin) return;
         const { data } = await supabase.from('mensajes').select('*').order('fecha_envio', { ascending: false });
         if (data) setAnnouncements(data);
     };
 
     const fetchStudentGrades = async (studentId: string) => {
-        const { data } = await supabase.from('notas').select('*').eq('estudiante_id', studentId);
-        if (data) setStudentGrades(data);
+        let query = supabase.from('notas').select('*').eq('estudiante_id', studentId);
+        const { data } = await query;
+        
+        if (data) {
+             if (isTeacher) {
+                const myCourseIds = coursesList.map(c => c.id);
+                setStudentGrades(data.filter((g: any) => myCourseIds.includes(g.curso_id)));
+            } else {
+                setStudentGrades(data);
+            }
+        }
     };
 
     // --- HANDLERS ESTUDIANTES ---
     const handleSelectStudent = (student: StudentData) => {
         setSelectedStudent(student);
+        // Cargar datos para edición
         setEditPhotoUrl(student.avatar_url || '');
+        setEditName(student.nombre);
+        setEditEmail(student.email || '');
+        setEditPassword(student.password || ''); // Precargar contraseña
+        
         fetchStudentGrades(student.id);
         setConfirmDeleteGradeId(null);
     };
 
     const handleCreateStudent = async () => {
+        if (!isSuperAdmin) return; 
         if (!newStudentName || !newStudentPassword) return;
 
         const { error } = await supabase.from('estudiantes').insert({
             nombre: newStudentName,
             email: newStudentEmail || null,
             password: newStudentPassword,
-            rol: 'estudiante',
+            rol: newUserRole, // AQUI SE USA EL ROL SELECCIONADO
             activo: true,
             avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(newStudentName)}&background=random&color=fff`
         });
@@ -218,14 +282,16 @@ const TeacherPanel: React.FC = () => {
             setNewStudentName('');
             setNewStudentEmail('');
             setNewStudentPassword('');
+            setNewUserRole('estudiante'); // Reset
             setIsCreatingStudent(false);
             fetchStudents();
         } else {
-            alert('Error al crear estudiante: ' + error.message);
+            alert('Error al crear usuario: ' + error.message);
         }
     };
 
     const handleDeleteStudent = async (id: string) => {
+        if (!isSuperAdmin) return;
         const { error } = await supabase.from('estudiantes').delete().eq('id', id);
         
         if (!error) {
@@ -234,26 +300,84 @@ const TeacherPanel: React.FC = () => {
             if (selectedStudent?.id === id) setSelectedStudent(null);
         } else {
             if (error.message.includes('foreign key constraint')) {
-                alert("No se puede borrar el estudiante porque tiene notas, asignaciones o mensajes asociados. Borra sus registros primero.");
+                alert("No se puede borrar el usuario porque tiene notas, asignaciones o mensajes asociados. Borra sus registros primero.");
             } else {
                 alert("Error al borrar: " + error.message);
             }
         }
     };
 
-    const handleUpdateStudent = async () => {
+    const handleUpdateStudentProfile = async () => {
         if (!selectedStudent) return;
-        const { error } = await supabase.from('estudiantes').update({ avatar_url: editPhotoUrl }).eq('id', selectedStudent.id);
+        
+        // Construir objeto de actualización
+        const updates: any = {
+            avatar_url: editPhotoUrl,
+            nombre: editName,
+            email: editEmail
+        };
+
+        // Solo actualizar contraseña si se escribió algo
+        if (editPassword && editPassword.trim() !== '') {
+            updates.password = editPassword;
+        }
+
+        const { error } = await supabase.from('estudiantes').update(updates).eq('id', selectedStudent.id);
+        
         if (!error) {
-            const btn = document.getElementById('save-photo-btn');
-            if(btn) { btn.innerText = '¡Guardado!'; setTimeout(() => btn.innerText = 'Guardar Foto', 2000); }
+            const btn = document.getElementById('save-profile-btn');
+            if(btn) { btn.innerText = '¡Guardado!'; setTimeout(() => btn.innerText = 'Actualizar Datos', 2000); }
+            
+            // Actualizar estado local
+            setSelectedStudent({...selectedStudent, ...updates});
             fetchStudents();
+        } else {
+            alert("Error al actualizar perfil: " + error.message);
         }
     };
 
     const handleToggleActive = async (student: StudentData) => {
+        if (!isSuperAdmin) return;
         const { error } = await supabase.from('estudiantes').update({ activo: !student.activo }).eq('id', student.id);
         if (!error) fetchStudents();
+    };
+
+    // --- EMAIL HANDLER (NUEVO) ---
+    const handleSendCredentials = async (student: StudentData) => {
+        if (!student.email) {
+            alert("Este usuario no tiene un correo electrónico registrado. Por favor edita su perfil y agrega uno.");
+            return;
+        }
+        
+        if (!confirm(`¿Enviar credenciales a ${student.email}?`)) return;
+
+        setSendingEmailId(student.id);
+
+        try {
+            const response = await fetch('/.netlify/functions/send-welcome-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: student.email,
+                    name: student.nombre,
+                    password: student.password, 
+                    role: student.rol
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                alert(`✅ Correo enviado exitosamente a ${student.nombre}`);
+            } else {
+                alert(`❌ Error al enviar correo: ${result.error || 'Desconocido'}`);
+            }
+        } catch (error) {
+            console.error(error);
+            alert("❌ Error de conexión al enviar el correo.");
+        } finally {
+            setSendingEmailId(null);
+        }
     };
 
     const handleAddGrade = async () => {
@@ -279,13 +403,15 @@ const TeacherPanel: React.FC = () => {
         }
     };
 
-    // --- HANDLER CURSOS (NUEVO) ---
+    // --- HANDLER CURSOS ---
     const handleUpdateCourse = async () => {
         if (!editingCourse) return;
+        const profName = isTeacher ? user.name : editingCourse.profesor;
+
         const { error } = await supabase.from('cursos').update({
             descripcion: editingCourse.descripcion,
             contenido_detallado: editingCourse.contenido_detallado,
-            profesor: editingCourse.profesor,
+            profesor: profName,
             creditos: editingCourse.creditos
         }).eq('id', editingCourse.id);
 
@@ -456,6 +582,7 @@ const TeacherPanel: React.FC = () => {
 
     // --- HANDLERS ANUNCIOS ---
     const handleAddAnnouncement = async () => {
+        if (!isSuperAdmin) return;
         if (!newAnnounceContent) return;
         const { error } = await supabase.from('mensajes').insert({
             remitente: newAnnounceSender || 'Dirección',
@@ -470,6 +597,7 @@ const TeacherPanel: React.FC = () => {
     };
 
     const handleDeleteAnnouncement = async (id: string) => {
+        if (!isSuperAdmin) return;
         const { error } = await supabase.from('mensajes').delete().eq('id', id);
         if (!error) {
             fetchAnnouncements();
@@ -488,25 +616,67 @@ const TeacherPanel: React.FC = () => {
             <div className="space-y-6 animate-fade-in">
                 <div className="flex justify-between items-center mb-4">
                     <button onClick={() => setSelectedStudent(null)} className="text-blue-600 hover:underline flex items-center">← Volver a la lista</button>
-                    <button 
-                        onClick={handleDownloadReport} 
-                        disabled={isGeneratingPdf}
-                        className="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center hover:bg-gray-900 shadow disabled:opacity-50"
-                    >
-                        <DownloadIcon className="h-5 w-5 mr-2"/>
-                        {isGeneratingPdf ? 'Generando...' : 'Descargar Boletín PDF'}
-                    </button>
+                    <div className="flex space-x-2">
+                        {isSuperAdmin && (
+                            <button 
+                                onClick={() => handleSendCredentials(selectedStudent)}
+                                disabled={sendingEmailId === selectedStudent.id}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 shadow disabled:opacity-50"
+                            >
+                                <MailIcon className="h-5 w-5 mr-2"/>
+                                {sendingEmailId === selectedStudent.id ? 'Enviando...' : 'Enviar Credenciales'}
+                            </button>
+                        )}
+                        <button 
+                            onClick={handleDownloadReport} 
+                            disabled={isGeneratingPdf}
+                            className="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center hover:bg-gray-900 shadow disabled:opacity-50"
+                        >
+                            <DownloadIcon className="h-5 w-5 mr-2"/>
+                            {isGeneratingPdf ? 'Generando...' : 'Descargar Boletín PDF'}
+                        </button>
+                    </div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Perfil */}
+                    {/* Perfil & Edición */}
                     <div>
                         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Perfil: {selectedStudent.nombre}</h2>
-                        <div className="flex flex-col items-center space-y-4">
+                        
+                        <div className="flex flex-col items-center space-y-4 mb-6">
                             <img src={editPhotoUrl || selectedStudent.avatar_url} className="w-32 h-32 rounded-full object-cover border-4 border-blue-500" />
-                            <input type="text" value={editPhotoUrl} onChange={(e) => setEditPhotoUrl(e.target.value)} className="w-full px-3 py-2 rounded-md border dark:bg-gray-700 dark:text-white" placeholder="URL de la foto" />
-                            <button id="save-photo-btn" onClick={handleUpdateStudent} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">Guardar Foto</button>
                         </div>
+
+                        {/* FORMULARIO DE EDICIÓN (SOLO ADMIN) */}
+                        {isSuperAdmin ? (
+                            <div className="space-y-3 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Foto URL</label>
+                                    <input type="text" value={editPhotoUrl} onChange={(e) => setEditPhotoUrl(e.target.value)} className="w-full px-3 py-2 rounded-md border dark:bg-gray-700 dark:text-white text-sm" placeholder="https://..." />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Nombre Completo</label>
+                                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-3 py-2 rounded-md border dark:bg-gray-700 dark:text-white text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Correo Electrónico</label>
+                                    <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="w-full px-3 py-2 rounded-md border dark:bg-gray-700 dark:text-white text-sm" placeholder="nombre@correo.com" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Contraseña (Opcional)</label>
+                                    <input type="text" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} className="w-full px-3 py-2 rounded-md border dark:bg-gray-700 dark:text-white text-sm" placeholder="Escribe para cambiarla" />
+                                </div>
+                                <button id="save-profile-btn" onClick={handleUpdateStudentProfile} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 font-bold transition-colors">
+                                    Actualizar Datos Personales
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="text-center">
+                                <p className="text-gray-600 dark:text-gray-400">{selectedStudent.email}</p>
+                                <p className="text-sm text-gray-500 capitalize">{selectedStudent.rol}</p>
+                            </div>
+                        )}
                     </div>
+
                     {/* Notas */}
                     <div>
                         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Gestión de Notas</h2>
@@ -553,7 +723,8 @@ const TeacherPanel: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between mb-2">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
-                    <UserGroupIcon className="h-8 w-8 mr-3 text-amber-500"/>Panel Docente
+                    <UserGroupIcon className="h-8 w-8 mr-3 text-amber-500"/>
+                    {isSuperAdmin ? 'Panel de Dirección' : `Panel Docente: ${user.name}`}
                 </h1>
             </div>
 
@@ -564,10 +735,12 @@ const TeacherPanel: React.FC = () => {
                 <button onClick={() => setActiveTab('assignments')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'assignments' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asignaciones</button>
                 <button onClick={() => setActiveTab('exams')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'exams' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Exámenes</button>
                 <button onClick={() => setActiveTab('attendance')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'attendance' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asistencia</button>
-                <button onClick={() => setActiveTab('announcements')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Anuncios</button>
+                {isSuperAdmin && (
+                    <button onClick={() => setActiveTab('announcements')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Anuncios</button>
+                )}
             </div>
 
-            {/* TAB CONTENT: COURSES (NUEVO) */}
+            {/* TAB CONTENT: COURSES */}
             {activeTab === 'courses' && (
                 <div className="grid grid-cols-1 gap-6">
                     {editingCourse ? (
@@ -593,7 +766,8 @@ const TeacherPanel: React.FC = () => {
                                             type="text" 
                                             value={editingCourse.profesor || ''} 
                                             onChange={(e) => setEditingCourse({...editingCourse, profesor: e.target.value})}
-                                            className="w-full p-2 mt-1 rounded border dark:bg-gray-700 dark:text-white"
+                                            className={`w-full p-2 mt-1 rounded border dark:bg-gray-700 dark:text-white ${!isSuperAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            disabled={!isSuperAdmin} 
                                         />
                                     </div>
                                 </div>
@@ -657,26 +831,38 @@ const TeacherPanel: React.FC = () => {
             {/* TAB CONTENT: STUDENTS */}
             {activeTab === 'students' && (
                 <div className="space-y-4">
-                    <div className="flex justify-end">
-                        <button 
-                            onClick={() => setIsCreatingStudent(!isCreatingStudent)} 
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center shadow-sm"
-                        >
-                            <PlusIcon className="h-5 w-5 mr-2"/>
-                            {isCreatingStudent ? 'Cancelar Registro' : 'Registrar Alumno'}
-                        </button>
-                    </div>
+                    {isSuperAdmin && (
+                        <div className="flex justify-end">
+                            <button 
+                                onClick={() => setIsCreatingStudent(!isCreatingStudent)} 
+                                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center shadow-sm"
+                            >
+                                <PlusIcon className="h-5 w-5 mr-2"/>
+                                {isCreatingStudent ? 'Cancelar Registro' : 'Registrar Usuario'}
+                            </button>
+                        </div>
+                    )}
 
-                    {isCreatingStudent && (
+                    {isCreatingStudent && isSuperAdmin && (
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-green-200 dark:border-green-900 animate-fade-in">
-                            <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Datos del Nuevo Alumno</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Datos del Nuevo Usuario</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <input type="text" placeholder="Nombre Completo" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} className="p-2 rounded border dark:bg-gray-700 dark:text-white" />
                                 <input type="email" placeholder="Correo Electrónico (Opcional)" value={newStudentEmail} onChange={(e) => setNewStudentEmail(e.target.value)} className="p-2 rounded border dark:bg-gray-700 dark:text-white" />
                                 <input type="text" placeholder="Contraseña de Acceso" value={newStudentPassword} onChange={(e) => setNewStudentPassword(e.target.value)} className="p-2 rounded border dark:bg-gray-700 dark:text-white" />
+                                
+                                {/* SELECTOR DE ROL AÑADIDO */}
+                                <select 
+                                    value={newUserRole} 
+                                    onChange={(e) => setNewUserRole(e.target.value)} 
+                                    className="p-2 rounded border dark:bg-gray-700 dark:text-white bg-white dark:bg-gray-800"
+                                >
+                                    <option value="estudiante">Estudiante</option>
+                                    <option value="profesor">Profesor</option>
+                                </select>
                             </div>
                             <div className="mt-4 flex justify-end">
-                                <button onClick={handleCreateStudent} disabled={!newStudentName || !newStudentPassword} className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50 font-bold">Guardar Alumno</button>
+                                <button onClick={handleCreateStudent} disabled={!newStudentName || !newStudentPassword} className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50 font-bold">Guardar Usuario</button>
                             </div>
                         </div>
                     )}
@@ -685,7 +871,8 @@ const TeacherPanel: React.FC = () => {
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estudiante</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Usuario</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Rol</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estado</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
                                 </tr>
@@ -698,18 +885,41 @@ const TeacherPanel: React.FC = () => {
                                             <span className="text-sm font-medium text-gray-900 dark:text-white">{student.nombre}</span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <button onClick={() => handleToggleActive(student)} className={`px-2 py-1 text-xs font-bold rounded-full ${student.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{student.activo ? 'ACTIVO' : 'INACTIVO'}</button>
+                                            <span className={`px-2 py-1 text-xs font-bold rounded-full capitalize ${student.rol === 'profesor' ? 'bg-purple-100 text-purple-800' : student.rol === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+                                                {student.rol || 'estudiante'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            {isSuperAdmin ? (
+                                                <button onClick={() => handleToggleActive(student)} className={`px-2 py-1 text-xs font-bold rounded-full ${student.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{student.activo ? 'ACTIVO' : 'INACTIVO'}</button>
+                                            ) : (
+                                                <span className={`px-2 py-1 text-xs font-bold rounded-full ${student.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{student.activo ? 'ACTIVO' : 'INACTIVO'}</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <div className="flex justify-end space-x-3 items-center">
+                                                {isSuperAdmin && student.email && (
+                                                    <button 
+                                                        onClick={() => handleSendCredentials(student)}
+                                                        disabled={sendingEmailId === student.id}
+                                                        className={`text-gray-500 hover:text-blue-600 transition-colors ${sendingEmailId === student.id ? 'opacity-50' : ''}`}
+                                                        title="Enviar credenciales por correo"
+                                                    >
+                                                        <MailIcon className="h-5 w-5" />
+                                                    </button>
+                                                )}
                                                 <button onClick={() => handleSelectStudent(student)} className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 text-sm font-medium"><PencilIcon className="h-4 w-4 inline mr-1"/>Gestionar</button>
-                                                {confirmDeleteStudentId === student.id ? (
-                                                    <div className="flex space-x-1 animate-fade-in">
-                                                        <button onClick={() => handleDeleteStudent(student.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700">Si</button>
-                                                        <button onClick={() => setConfirmDeleteStudentId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded hover:bg-gray-400">No</button>
-                                                    </div>
-                                                ) : (
-                                                    <button onClick={() => setConfirmDeleteStudentId(student.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
+                                                {isSuperAdmin && (
+                                                    <>
+                                                        {confirmDeleteStudentId === student.id ? (
+                                                            <div className="flex space-x-1 animate-fade-in">
+                                                                <button onClick={() => handleDeleteStudent(student.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700">Si</button>
+                                                                <button onClick={() => setConfirmDeleteStudentId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded hover:bg-gray-400">No</button>
+                                                            </div>
+                                                        ) : (
+                                                            <button onClick={() => setConfirmDeleteStudentId(student.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </td>
@@ -788,7 +998,7 @@ const TeacherPanel: React.FC = () => {
                 </div>
             )}
 
-            {/* TAB CONTENT: ASSIGNMENTS */}
+            {/* TAB CONTENT: ASSIGNMENTS (Reuse existing) */}
             {activeTab === 'assignments' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
@@ -837,7 +1047,7 @@ const TeacherPanel: React.FC = () => {
                 </div>
             )}
 
-            {/* TAB CONTENT: EXAMS */}
+            {/* TAB CONTENT: EXAMS (Reuse existing) */}
             {activeTab === 'exams' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
@@ -887,70 +1097,6 @@ const TeacherPanel: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
-                </div>
-            )}
-
-            {/* TAB CONTENT: ANNOUNCEMENTS (Mensajes Globales) */}
-            {activeTab === 'announcements' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Formulario */}
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
-                        <h2 className="text-lg font-bold mb-4 flex items-center text-gray-800 dark:text-white"><MailIcon className="h-5 w-5 mr-2 text-blue-500"/>Nuevo Anuncio</h2>
-                        <div className="space-y-3">
-                            <input 
-                                type="text" 
-                                placeholder="Remitente (Ej: Dirección)" 
-                                value={newAnnounceSender} 
-                                onChange={(e) => setNewAnnounceSender(e.target.value)} 
-                                className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white" 
-                            />
-                            <textarea 
-                                placeholder="Escribe el mensaje o anuncio aquí..." 
-                                value={newAnnounceContent} 
-                                onChange={(e) => setNewAnnounceContent(e.target.value)} 
-                                className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white h-32"
-                            />
-                            <button 
-                                onClick={handleAddAnnouncement} 
-                                disabled={!newAnnounceContent} 
-                                className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 font-bold"
-                            >
-                                Publicar Anuncio
-                            </button>
-                        </div>
-                    </div>
-                    {/* Lista */}
-                    <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-                        <div className="px-6 py-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                            <h3 className="font-bold text-gray-700 dark:text-gray-200">Anuncios Publicados (Visibles en Home)</h3>
-                        </div>
-                        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {announcements.map(msg => (
-                                <div key={msg.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex justify-between items-start">
-                                    <div>
-                                        <p className="font-semibold text-gray-900 dark:text-white">{msg.asunto}</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">De: <span className="font-medium">{msg.remitente}</span></p>
-                                        <p className="text-xs text-gray-400 mt-1">{new Date(msg.fecha_envio).toLocaleDateString()} {new Date(msg.fecha_envio).toLocaleTimeString()}</p>
-                                    </div>
-                                    <div className="ml-4">
-                                        {confirmDeleteAnnounceId === msg.id ? (
-                                            <div className="flex space-x-2">
-                                                <button onClick={() => handleDeleteAnnouncement(msg.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded">Borrar</button>
-                                                <button onClick={() => setConfirmDeleteAnnounceId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded">X</button>
-                                            </div>
-                                        ) : (
-                                            <button onClick={() => setConfirmDeleteAnnounceId(msg.id)} className="text-gray-400 hover:text-red-500 p-1">
-                                                <TrashIcon className="h-5 w-5"/>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                            {announcements.length === 0 && (
-                                <div className="p-8 text-center text-gray-500">No hay anuncios publicados.</div>
-                            )}
-                        </div>
                     </div>
                 </div>
             )}

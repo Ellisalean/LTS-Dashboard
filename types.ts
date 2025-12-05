@@ -4,7 +4,7 @@ export interface User {
   name: string;
   email: string;
   avatarUrl: string;
-  role?: 'admin' | 'estudiante';
+  role?: 'admin' | 'estudiante' | 'profesor';
 }
 
 export interface Student {
@@ -71,6 +71,7 @@ export interface Message {
   subject: string;
   isRead: boolean;
   timestamp: string;
+  type?: 'global' | 'personal';
 }
 
 export interface Attendance {

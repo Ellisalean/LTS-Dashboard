@@ -50,7 +50,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             case View.Chat:
                 return <ChatView user={user} />;
             case View.TeacherPanel:
-                return <TeacherPanel />;
+                return <TeacherPanel user={user} />;
             default:
                 return <Home user={user} events={calendarEvents} messages={messages} />;
         }

@@ -7,7 +7,7 @@ import { HomeIcon, BookOpenIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIco
 interface SidebarProps {
     activeView: View;
     setActiveView: (view: View) => void;
-    userRole?: 'admin' | 'estudiante';
+    userRole?: 'admin' | 'estudiante' | 'profesor';
     unreadChatCount?: number;
 }
 
@@ -53,8 +53,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, userRole, 
                     </button>
                 ))}
 
-                {/* Botón especial solo para PROFESORES/ADMINS */}
-                {userRole === 'admin' && (
+                {/* Botón especial para PROFESORES y ADMINS */}
+                {(userRole === 'admin' || userRole === 'profesor') && (
                      <button
                         onClick={() => setActiveView(View.TeacherPanel)}
                         className={`flex items-center w-full px-4 py-3 mt-6 text-left text-sm font-medium rounded-lg transition-colors duration-200 border border-amber-500/30

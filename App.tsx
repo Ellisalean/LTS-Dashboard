@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import Login from './components/Login.tsx';
 import Dashboard from './components/Dashboard.tsx';
@@ -26,11 +27,16 @@ const App: React.FC = () => {
             const inputPass = password.trim();
 
             if (student.activo && storedPass === inputPass) {
+                // Determinar el rol correctamente
+                let role: 'admin' | 'estudiante' | 'profesor' = 'estudiante';
+                if (student.rol === 'admin') role = 'admin';
+                else if (student.rol === 'profesor') role = 'profesor';
+
                 const userPayload: User = {
                     name: student.nombre,
                     email: student.email || 'No disponible',
                     avatarUrl: student.avatar_url || `https://i.pravatar.cc/150?u=${encodeURIComponent(student.nombre)}`,
-                    role: student.rol === 'admin' ? 'admin' : 'estudiante'
+                    role: role
                 };
                 setUser(userPayload);
                 return true;
