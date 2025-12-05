@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../application/supabase.ts';
 import { Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus, User } from '../types.ts';
@@ -77,6 +78,7 @@ export const useRealtimeData = (user: User | null) => {
                         credits: c.creditos,
                         status: computedStatus, // Usamos el estado calculado, ignoramos el de la DB global
                         description: c.descripcion,
+                        detailedContent: c.contenido_detallado // Nuevo campo mapeado
                     };
                 });
 

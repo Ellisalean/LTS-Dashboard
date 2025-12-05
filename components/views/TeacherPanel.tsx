@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../application/supabase.ts';
-import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon } from '../Icons.tsx';
+import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon } from '../Icons.tsx';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
 // @ts-ignore
@@ -45,6 +45,16 @@ interface AnnouncementData {
     fecha_envio: string;
 }
 
+// Interfaz para Cursos en el panel docente
+interface CourseAdminData {
+    id: string;
+    nombre: string;
+    profesor: string;
+    descripcion: string;
+    contenido_detallado?: string;
+    creditos: number;
+}
+
 // Helper para convertir URL de imagen a Base64 para el PDF
 const getImageData = (url: string): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -75,7 +85,7 @@ const LOGO_URL = "https://cdn.myportfolio.com/d435fa58-d32c-4141-8a15-0f2bfccdea
 
 const TeacherPanel: React.FC = () => {
     // ESTADO GENERAL
-    const [activeTab, setActiveTab] = useState<'students' | 'assignments' | 'exams' | 'attendance' | 'announcements'>('students');
+    const [activeTab, setActiveTab] = useState<'students' | 'assignments' | 'exams' | 'attendance' | 'announcements' | 'courses'>('students');
     const [coursesList, setCoursesList] = useState<{id: string, nombre: string}[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -125,6 +135,10 @@ const TeacherPanel: React.FC = () => {
     const [newAnnounceContent, setNewAnnounceContent] = useState('');
     const [confirmDeleteAnnounceId, setConfirmDeleteAnnounceId] = useState<string | null>(null);
 
+    // --- ESTADO CURSOS (NUEVO) ---
+    const [adminCourses, setAdminCourses] = useState<CourseAdminData[]>([]);
+    const [editingCourse, setEditingCourse] = useState<CourseAdminData | null>(null);
+
     // CARGA INICIAL
     useEffect(() => {
         const init = async () => {
@@ -140,12 +154,18 @@ const TeacherPanel: React.FC = () => {
         if (activeTab === 'assignments') fetchAssignments();
         if (activeTab === 'exams') fetchExams();
         if (activeTab === 'announcements') fetchAnnouncements();
+        if (activeTab === 'courses') fetchAdminCourses();
     }, [activeTab]);
 
     // --- FETCHERS ---
     const fetchCourses = async () => {
         const { data } = await supabase.from('cursos').select('id, nombre').order('nombre');
         if (data) setCoursesList(data);
+    };
+
+    const fetchAdminCourses = async () => {
+        const { data } = await supabase.from('cursos').select('*').order('nombre');
+        if (data) setAdminCourses(data);
     };
 
     const fetchStudents = async () => {
@@ -258,20 +278,34 @@ const TeacherPanel: React.FC = () => {
         }
     };
 
+    // --- HANDLER CURSOS (NUEVO) ---
+    const handleUpdateCourse = async () => {
+        if (!editingCourse) return;
+        const { error } = await supabase.from('cursos').update({
+            descripcion: editingCourse.descripcion,
+            contenido_detallado: editingCourse.contenido_detallado,
+            profesor: editingCourse.profesor,
+            creditos: editingCourse.creditos
+        }).eq('id', editingCourse.id);
+
+        if (!error) {
+            setEditingCourse(null);
+            fetchAdminCourses();
+        } else {
+            alert('Error al actualizar curso: ' + error.message);
+        }
+    };
+
     // --- PDF GENERATOR ---
     const handleDownloadReport = async () => {
         if (!selectedStudent) return;
         setIsGeneratingPdf(true);
         
         try {
-            // HACK: Manejar diferentes tipos de exportación (Default vs Named)
             const JsPDFClass = (jsPDF as any).jsPDF || jsPDF;
             const doc = new JsPDFClass();
-
-            // HACK: Lo mismo para autoTable
             const autoTableFunc = (autoTable as any).default || autoTable;
 
-            // 1. Obtener Logo
             let logoBase64 = null;
             try {
                 logoBase64 = await getImageData(LOGO_URL);
@@ -279,11 +313,9 @@ const TeacherPanel: React.FC = () => {
                 console.warn("No se pudo cargar el logo, se usará fallback", err);
             }
 
-            // Insertar Logo (X, Y, Ancho, Alto)
             if (logoBase64) {
                 doc.addImage(logoBase64, 'PNG', 14, 12, 20, 20);
             } else {
-                // Fallback si falla la imagen
                 doc.setFillColor(23, 37, 84);
                 doc.rect(14, 12, 20, 20, 'F');
                 doc.setFillColor(255, 255, 255);
@@ -291,21 +323,18 @@ const TeacherPanel: React.FC = () => {
                 doc.text("LTS", 16, 24);
             }
 
-            // Header - Ajustado para dejar espacio al logo
             doc.setFontSize(22);
-            doc.setTextColor(23, 37, 84); // Azul oscuro
+            doc.setTextColor(23, 37, 84);
             doc.text("Latin Theological Seminary", 40, 23);
             
             doc.setFontSize(14);
             doc.setTextColor(100);
             doc.text("Boletín Oficial de Calificaciones", 40, 30);
 
-            // Línea divisoria
             doc.setDrawColor(23, 37, 84);
             doc.setLineWidth(0.5);
             doc.line(14, 38, 196, 38);
             
-            // Información del Estudiante
             doc.setFontSize(11);
             doc.setTextColor(50);
             doc.text(`Nombre del Alumno:`, 14, 50);
@@ -319,7 +348,6 @@ const TeacherPanel: React.FC = () => {
             doc.text(`Fecha de Emisión:`, 14, 66);
             doc.text(new Date().toLocaleDateString(), 55, 66);
 
-            // Tabla de Notas
             const tableData = studentGrades.map(g => [
                 coursesList.find(c => c.id === g.curso_id)?.nombre || g.curso_id,
                 g.titulo_asignacion,
@@ -331,12 +359,11 @@ const TeacherPanel: React.FC = () => {
                 head: [['Materia / Curso', 'Evaluación', 'Calificación']],
                 body: tableData,
                 theme: 'striped',
-                headStyles: { fillColor: [23, 37, 84], textColor: [255, 255, 255] }, // Azul Institucional
+                headStyles: { fillColor: [23, 37, 84], textColor: [255, 255, 255] },
                 styles: { fontSize: 10, cellPadding: 3 },
                 alternateRowStyles: { fillColor: [240, 245, 255] }
             });
 
-            // Pie de página
             const pageCount = (doc as any).internal.getNumberOfPages();
             for(let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
@@ -456,7 +483,6 @@ const TeacherPanel: React.FC = () => {
 
     // 1. VISTA DE DETALLE ESTUDIANTE (Sub-view)
     if (selectedStudent && activeTab === 'students') {
-        // ... (Mismo código de detalle estudiante) ...
         return (
             <div className="space-y-6 animate-fade-in">
                 <div className="flex justify-between items-center mb-4">
@@ -533,11 +559,99 @@ const TeacherPanel: React.FC = () => {
             {/* TABS NAVIGATION */}
             <div className="flex space-x-1 bg-gray-200 dark:bg-gray-700 p-1 rounded-lg w-full md:w-fit overflow-x-auto">
                 <button onClick={() => setActiveTab('students')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'students' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Estudiantes</button>
+                <button onClick={() => setActiveTab('courses')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'courses' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Cursos</button>
                 <button onClick={() => setActiveTab('assignments')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'assignments' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asignaciones</button>
                 <button onClick={() => setActiveTab('exams')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'exams' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Exámenes</button>
                 <button onClick={() => setActiveTab('attendance')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'attendance' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asistencia</button>
                 <button onClick={() => setActiveTab('announcements')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Anuncios</button>
             </div>
+
+            {/* TAB CONTENT: COURSES (NUEVO) */}
+            {activeTab === 'courses' && (
+                <div className="grid grid-cols-1 gap-6">
+                    {editingCourse ? (
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md animate-fade-in">
+                            <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white flex items-center">
+                                <PencilIcon className="h-6 w-6 mr-2 text-blue-500"/>
+                                Editando Curso: {editingCourse.nombre}
+                            </h2>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción Corta (Tarjeta)</label>
+                                        <input 
+                                            type="text" 
+                                            value={editingCourse.descripcion || ''} 
+                                            onChange={(e) => setEditingCourse({...editingCourse, descripcion: e.target.value})}
+                                            className="w-full p-2 mt-1 rounded border dark:bg-gray-700 dark:text-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Profesor</label>
+                                        <input 
+                                            type="text" 
+                                            value={editingCourse.profesor || ''} 
+                                            onChange={(e) => setEditingCourse({...editingCourse, profesor: e.target.value})}
+                                            className="w-full p-2 mt-1 rounded border dark:bg-gray-700 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Créditos</label>
+                                    <input 
+                                        type="number" 
+                                        value={editingCourse.creditos || 0} 
+                                        onChange={(e) => setEditingCourse({...editingCourse, creditos: Number(e.target.value)})}
+                                        className="w-24 p-2 mt-1 rounded border dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Contenido Detallado / Syllabus (Reseña Larga)</label>
+                                    <textarea 
+                                        value={editingCourse.contenido_detallado || ''} 
+                                        onChange={(e) => setEditingCourse({...editingCourse, contenido_detallado: e.target.value})}
+                                        className="w-full p-2 mt-1 rounded border dark:bg-gray-700 dark:text-white h-48"
+                                        placeholder="Escribe aquí todo el contenido, objetivos o reseña detallada del curso..."
+                                    />
+                                </div>
+                                <div className="flex justify-end space-x-3">
+                                    <button onClick={() => setEditingCourse(null)} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Cancelar</button>
+                                    <button onClick={handleUpdateCourse} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Guardar Cambios</button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">ID</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nombre</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Profesor</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Créditos</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                    {adminCourses.map(c => (
+                                        <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-500 dark:text-gray-400">{c.id}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{c.nombre}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{c.profesor}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-300">{c.creditos}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                <button onClick={() => setEditingCourse(c)} className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 font-medium flex items-center justify-end w-full">
+                                                    <PencilIcon className="h-4 w-4 mr-1"/> Editar
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* TAB CONTENT: STUDENTS */}
             {activeTab === 'students' && (

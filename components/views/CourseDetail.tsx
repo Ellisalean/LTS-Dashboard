@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Course, User, Assignment, Exam, Grade } from '../../types.ts';
-import { ChevronLeftIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon, CheckCircleIcon, ClockIcon } from '../Icons.tsx';
+import { ChevronLeftIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon, CheckCircleIcon, ClockIcon, BookOpenIcon } from '../Icons.tsx';
 
 interface CourseDetailProps {
     course: Course;
@@ -129,8 +130,21 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, user, onBack, allAs
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{course.title}</h1>
                 <p className="text-gray-500 dark:text-gray-400 mt-1">{course.id}</p>
                 <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">Profesor: <span className="font-semibold">{course.professor}</span></p>
-                <p className="mt-4 text-gray-600 dark:text-gray-400">{course.description}</p>
+                <p className="mt-4 text-gray-600 dark:text-gray-400 border-l-4 border-blue-500 pl-4 italic">{course.description}</p>
             </div>
+
+            {/* SECCIÓN NUEVA: CONTENIDO DETALLADO */}
+            {course.detailedContent && (
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-8">
+                    <h3 className="text-xl font-bold flex items-center mb-4 text-gray-900 dark:text-white">
+                        <BookOpenIcon className="h-6 w-6 mr-3 text-purple-500" />
+                        Sobre este Curso
+                    </h3>
+                    <div className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+                        {course.detailedContent}
+                    </div>
+                </div>
+            )}
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-8">

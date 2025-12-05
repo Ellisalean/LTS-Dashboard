@@ -27,6 +27,7 @@ export interface Course {
   credits: number;
   status: CourseStatus;
   description: string;
+  detailedContent?: string; // Nuevo campo para la reseña larga
 }
 
 export interface Assignment {
