@@ -164,7 +164,8 @@ const TeacherPanel: React.FC = () => {
     };
 
     const fetchAdminCourses = async () => {
-        const { data } = await supabase.from('cursos').select('*').order('nombre');
+        // ORDENADO POR ID para mantener coherencia del pensum (THE101, THE102...)
+        const { data } = await supabase.from('cursos').select('*').order('id', { ascending: true });
         if (data) setAdminCourses(data);
     };
 
