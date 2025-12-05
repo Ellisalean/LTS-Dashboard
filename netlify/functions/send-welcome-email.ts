@@ -62,7 +62,7 @@ export const handler: Handler = async (event) => {
                     </div>
 
                     <div style="text-align: center;">
-                        <a href="https://lts-dashboard.netlify.app" class="btn" style="color: #ffffff;">Ingresar al Portal</a>
+                        <a href="https://ltsdashboard.netlify.app" class="btn" style="color: #ffffff;">Ingresar al Portal</a>
                     </div>
                 </div>
                 <div class="footer">
