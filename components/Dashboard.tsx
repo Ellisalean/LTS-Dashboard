@@ -20,6 +20,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     const [activeView, setActiveView] = useState<View>(View.Home);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar state
     
     // Obtener datos en tiempo real de Supabase
     const { courses, assignments, exams, grades, messages, calendarEvents, loading, unreadChatCount } = useRealtimeData(user);
@@ -60,9 +61,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
             <Sidebar 
                 activeView={activeView} 
-                setActiveView={setActiveView} 
+                setActiveView={(view) => {
+                    setActiveView(view);
+                    setIsSidebarOpen(false); // Close sidebar on selection (mobile)
+                }} 
                 userRole={user.role} 
-                unreadChatCount={unreadChatCount} // Pass count to sidebar
+                unreadChatCount={unreadChatCount}
+                isOpen={isSidebarOpen} // Pass open state
+                onClose={() => setIsSidebarOpen(false)} // Pass close handler
             />
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header 
@@ -70,7 +76,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     onLogout={onLogout} 
                     assignments={assignments} 
                     exams={exams} 
-                    unreadChatCount={unreadChatCount} // Pass count to header
+                    unreadChatCount={unreadChatCount} 
+                    onMenuClick={() => setIsSidebarOpen(true)} // Pass open handler
                 />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">
                     <div className="container mx-auto px-6 py-8">

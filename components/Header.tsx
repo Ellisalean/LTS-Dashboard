@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, Assignment, Exam } from '../types.ts';
-import { LogoutIcon, BellIcon, ClockIcon, AcademicCapIcon, ChatIcon } from './Icons.tsx';
+import { LogoutIcon, BellIcon, ClockIcon, AcademicCapIcon, ChatIcon, MenuIcon } from './Icons.tsx';
 
 interface HeaderProps {
     user: User;
@@ -9,9 +9,10 @@ interface HeaderProps {
     assignments?: Assignment[];
     exams?: Exam[];
     unreadChatCount?: number;
+    onMenuClick?: () => void; // New prop for mobile menu
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams = [], unreadChatCount = 0 }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams = [], unreadChatCount = 0, onMenuClick }) => {
     const [showNotifications, setShowNotifications] = useState(false);
 
     // Lógica para generar notificaciones inteligentes
@@ -66,7 +67,18 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
     }, [assignments, exams, unreadChatCount]);
 
     return (
-        <header className="flex items-center justify-end h-20 px-6 bg-white dark:bg-gray-800 border-b dark:border-gray-700 relative z-20">
+        <header className="flex items-center justify-between h-20 px-6 bg-white dark:bg-gray-800 border-b dark:border-gray-700 relative z-20">
+            {/* Mobile Menu Button - Visible only on mobile */}
+            <button 
+                onClick={onMenuClick}
+                className="md:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+                <MenuIcon className="h-6 w-6" />
+            </button>
+
+            {/* Spacer for desktop alignment or title if needed */}
+            <div className="hidden md:block"></div>
+
             <div className="flex items-center space-x-4">
                 
                 {/* NOTIFICATIONS BELL */}

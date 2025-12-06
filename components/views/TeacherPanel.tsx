@@ -797,32 +797,34 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                         </div>
                     ) : (
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead className="bg-gray-50 dark:bg-gray-700">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">ID</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nombre</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Profesor</th>
-                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Créditos</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {adminCourses.map(c => (
-                                        <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-500 dark:text-gray-400">{c.id}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{c.nombre}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{c.profesor}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-300">{c.creditos}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                <button onClick={() => setEditingCourse(c)} className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 font-medium flex items-center justify-end w-full">
-                                                    <PencilIcon className="h-4 w-4 mr-1"/> Editar
-                                                </button>
-                                            </td>
+                            <div className="overflow-x-auto"> {/* WRAPPER FOR HORIZONTAL SCROLLING */}
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                    <thead className="bg-gray-50 dark:bg-gray-700">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">ID</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nombre</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Profesor</th>
+                                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Créditos</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        {adminCourses.map(c => (
+                                            <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-500 dark:text-gray-400">{c.id}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{c.nombre}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{c.profesor}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 dark:text-gray-300">{c.creditos}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                    <button onClick={() => setEditingCourse(c)} className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 font-medium flex items-center justify-end w-full">
+                                                        <PencilIcon className="h-4 w-4 mr-1"/> Editar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -868,65 +870,67 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                     )}
 
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead className="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Usuario</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Rol</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estado</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {students.map((student) => (
-                                    <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                        <td className="px-6 py-4 whitespace-nowrap flex items-center">
-                                            <img className="h-8 w-8 rounded-full object-cover mr-3" src={student.avatar_url} />
-                                            <span className="text-sm font-medium text-gray-900 dark:text-white">{student.nombre}</span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <span className={`px-2 py-1 text-xs font-bold rounded-full capitalize ${student.rol === 'profesor' ? 'bg-purple-100 text-purple-800' : student.rol === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
-                                                {student.rol || 'estudiante'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            {isSuperAdmin ? (
-                                                <button onClick={() => handleToggleActive(student)} className={`px-2 py-1 text-xs font-bold rounded-full ${student.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{student.activo ? 'ACTIVO' : 'INACTIVO'}</button>
-                                            ) : (
-                                                <span className={`px-2 py-1 text-xs font-bold rounded-full ${student.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{student.activo ? 'ACTIVO' : 'INACTIVO'}</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                            <div className="flex justify-end space-x-3 items-center">
-                                                {isSuperAdmin && student.email && (
-                                                    <button 
-                                                        onClick={() => handleSendCredentials(student)}
-                                                        disabled={sendingEmailId === student.id}
-                                                        className={`text-gray-500 hover:text-blue-600 transition-colors ${sendingEmailId === student.id ? 'opacity-50' : ''}`}
-                                                        title="Enviar credenciales por correo"
-                                                    >
-                                                        <MailIcon className="h-5 w-5" />
-                                                    </button>
-                                                )}
-                                                <button onClick={() => handleSelectStudent(student)} className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 text-sm font-medium"><PencilIcon className="h-4 w-4 inline mr-1"/>Gestionar</button>
-                                                {isSuperAdmin && (
-                                                    <>
-                                                        {confirmDeleteStudentId === student.id ? (
-                                                            <div className="flex space-x-1 animate-fade-in">
-                                                                <button onClick={() => handleDeleteStudent(student.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700">Si</button>
-                                                                <button onClick={() => setConfirmDeleteStudentId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded hover:bg-gray-400">No</button>
-                                                            </div>
-                                                        ) : (
-                                                            <button onClick={() => setConfirmDeleteStudentId(student.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
+                        <div className="overflow-x-auto"> {/* WRAPPER FOR HORIZONTAL SCROLLING */}
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Usuario</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Rol</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estado</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                    {students.map((student) => (
+                                        <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                            <td className="px-6 py-4 whitespace-nowrap flex items-center">
+                                                <img className="h-8 w-8 rounded-full object-cover mr-3" src={student.avatar_url} />
+                                                <span className="text-sm font-medium text-gray-900 dark:text-white">{student.nombre}</span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className={`px-2 py-1 text-xs font-bold rounded-full capitalize ${student.rol === 'profesor' ? 'bg-purple-100 text-purple-800' : student.rol === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+                                                    {student.rol || 'estudiante'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                {isSuperAdmin ? (
+                                                    <button onClick={() => handleToggleActive(student)} className={`px-2 py-1 text-xs font-bold rounded-full ${student.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{student.activo ? 'ACTIVO' : 'INACTIVO'}</button>
+                                                ) : (
+                                                    <span className={`px-2 py-1 text-xs font-bold rounded-full ${student.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{student.activo ? 'ACTIVO' : 'INACTIVO'}</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                <div className="flex justify-end space-x-3 items-center">
+                                                    {isSuperAdmin && student.email && (
+                                                        <button 
+                                                            onClick={() => handleSendCredentials(student)}
+                                                            disabled={sendingEmailId === student.id}
+                                                            className={`text-gray-500 hover:text-blue-600 transition-colors ${sendingEmailId === student.id ? 'opacity-50' : ''}`}
+                                                            title="Enviar credenciales por correo"
+                                                        >
+                                                            <MailIcon className="h-5 w-5" />
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => handleSelectStudent(student)} className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 text-sm font-medium"><PencilIcon className="h-4 w-4 inline mr-1"/>Gestionar</button>
+                                                    {isSuperAdmin && (
+                                                        <>
+                                                            {confirmDeleteStudentId === student.id ? (
+                                                                <div className="flex space-x-1 animate-fade-in">
+                                                                    <button onClick={() => handleDeleteStudent(student.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700">Si</button>
+                                                                    <button onClick={() => setConfirmDeleteStudentId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded hover:bg-gray-400">No</button>
+                                                                </div>
+                                                            ) : (
+                                                                <button onClick={() => setConfirmDeleteStudentId(student.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}
@@ -953,46 +957,48 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
 
                     {Object.keys(attendanceList).length > 0 && (
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden animate-fade-in">
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead className="bg-gray-50 dark:bg-gray-700">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estudiante</th>
-                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estado de Asistencia</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {students.filter(s => s.activo).map((student) => (
-                                        <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                            <td className="px-6 py-4 flex items-center">
-                                                <img className="h-8 w-8 rounded-full object-cover mr-3" src={student.avatar_url} />
-                                                <span className="text-gray-900 dark:text-white font-medium">{student.nombre}</span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                                                    <button 
-                                                        onClick={() => handleMarkAttendance(student.id, 'presente')}
-                                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${attendanceList[student.id] === 'presente' ? 'bg-green-500 text-white shadow' : 'text-gray-500 hover:bg-gray-200'}`}
-                                                    >
-                                                        Presente
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleMarkAttendance(student.id, 'ausente')}
-                                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${attendanceList[student.id] === 'ausente' ? 'bg-red-500 text-white shadow' : 'text-gray-500 hover:bg-gray-200'}`}
-                                                    >
-                                                        Ausente
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleMarkAttendance(student.id, 'justificado')}
-                                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${attendanceList[student.id] === 'justificado' ? 'bg-blue-500 text-white shadow' : 'text-gray-500 hover:bg-gray-200'}`}
-                                                    >
-                                                        Justificado
-                                                    </button>
-                                                </div>
-                                            </td>
+                            <div className="overflow-x-auto"> {/* WRAPPER FOR HORIZONTAL SCROLLING */}
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                    <thead className="bg-gray-50 dark:bg-gray-700">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estudiante</th>
+                                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estado de Asistencia</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        {students.filter(s => s.activo).map((student) => (
+                                            <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                <td className="px-6 py-4 flex items-center">
+                                                    <img className="h-8 w-8 rounded-full object-cover mr-3" src={student.avatar_url} />
+                                                    <span className="text-gray-900 dark:text-white font-medium">{student.nombre}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <div className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                                                        <button 
+                                                            onClick={() => handleMarkAttendance(student.id, 'presente')}
+                                                            className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${attendanceList[student.id] === 'presente' ? 'bg-green-500 text-white shadow' : 'text-gray-500 hover:bg-gray-200'}`}
+                                                        >
+                                                            Presente
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleMarkAttendance(student.id, 'ausente')}
+                                                            className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${attendanceList[student.id] === 'ausente' ? 'bg-red-500 text-white shadow' : 'text-gray-500 hover:bg-gray-200'}`}
+                                                        >
+                                                            Ausente
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleMarkAttendance(student.id, 'justificado')}
+                                                            className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${attendanceList[student.id] === 'justificado' ? 'bg-blue-500 text-white shadow' : 'text-gray-500 hover:bg-gray-200'}`}
+                                                        >
+                                                            Justificado
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1014,35 +1020,37 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                         </div>
                     </div>
                     <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead className="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Curso</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tarea</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Entrega</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {assignments.map(a => (
-                                    <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                        <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">{coursesList.find(c => c.id === a.curso_id)?.nombre || a.curso_id}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{a.titulo}</td>
-                                        <td className="px-6 py-4 text-sm text-right text-gray-500 dark:text-gray-400">{a.fecha_entrega ? new Date(a.fecha_entrega).toLocaleDateString() : 'Sin fecha'}</td>
-                                        <td className="px-6 py-4 text-right">
-                                            {confirmDeleteAssignId === a.id ? (
-                                                <div className="flex justify-end space-x-2">
-                                                    <button onClick={() => handleDeleteAssignment(a.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded">Borrar</button>
-                                                    <button onClick={() => setConfirmDeleteAssignId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded">X</button>
-                                                </div>
-                                            ) : (
-                                                <button onClick={() => setConfirmDeleteAssignId(a.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
-                                            )}
-                                        </td>
+                        <div className="overflow-x-auto"> {/* WRAPPER FOR HORIZONTAL SCROLLING */}
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Curso</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tarea</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Entrega</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase"></th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                    {assignments.map(a => (
+                                        <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                            <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">{coursesList.find(c => c.id === a.curso_id)?.nombre || a.curso_id}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{a.titulo}</td>
+                                            <td className="px-6 py-4 text-sm text-right text-gray-500 dark:text-gray-400">{a.fecha_entrega ? new Date(a.fecha_entrega).toLocaleDateString() : 'Sin fecha'}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                {confirmDeleteAssignId === a.id ? (
+                                                    <div className="flex justify-end space-x-2">
+                                                        <button onClick={() => handleDeleteAssignment(a.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded">Borrar</button>
+                                                        <button onClick={() => setConfirmDeleteAssignId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded">X</button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => setConfirmDeleteAssignId(a.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1066,37 +1074,39 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                         </div>
                     </div>
                     <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead className="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Curso</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Examen</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fecha/Hora</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {exams.map(e => (
-                                    <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                        <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">{coursesList.find(c => c.id === e.curso_id)?.nombre || e.curso_id}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{e.titulo}</td>
-                                        <td className="px-6 py-4 text-sm text-right text-gray-500 dark:text-gray-400">
-                                            {e.fecha ? new Date(e.fecha).toLocaleDateString() : 'Sin fecha'} - {e.hora}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            {confirmDeleteExamId === e.id ? (
-                                                <div className="flex justify-end space-x-2">
-                                                    <button onClick={() => handleDeleteExam(e.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded">Borrar</button>
-                                                    <button onClick={() => setConfirmDeleteExamId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded">X</button>
-                                                </div>
-                                            ) : (
-                                                <button onClick={() => setConfirmDeleteExamId(e.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
-                                            )}
-                                        </td>
+                        <div className="overflow-x-auto"> {/* WRAPPER FOR HORIZONTAL SCROLLING */}
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Curso</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Examen</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fecha/Hora</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase"></th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                    {exams.map(e => (
+                                        <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                            <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white">{coursesList.find(c => c.id === e.curso_id)?.nombre || e.curso_id}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{e.titulo}</td>
+                                            <td className="px-6 py-4 text-sm text-right text-gray-500 dark:text-gray-400">
+                                                {e.fecha ? new Date(e.fecha).toLocaleDateString() : 'Sin fecha'} - {e.hora}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {confirmDeleteExamId === e.id ? (
+                                                    <div className="flex justify-end space-x-2">
+                                                        <button onClick={() => handleDeleteExam(e.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded">Borrar</button>
+                                                        <button onClick={() => setConfirmDeleteExamId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded">X</button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => setConfirmDeleteExamId(e.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

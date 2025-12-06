@@ -9,6 +9,8 @@ interface SidebarProps {
     setActiveView: (view: View) => void;
     userRole?: 'admin' | 'estudiante' | 'profesor';
     unreadChatCount?: number;
+    isOpen?: boolean; // New prop for mobile state
+    onClose?: () => void; // New prop to close sidebar
 }
 
 const navItems = [
@@ -21,10 +23,12 @@ const navItems = [
     { view: View.Chat, icon: ChatIcon, label: 'Mensajería' },
 ];
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, userRole, unreadChatCount = 0 }) => {
-    return (
-        <div className="flex flex-col w-64 bg-white dark:bg-gray-800 shadow-xl transition-all duration-300">
-            <div className="flex items-center justify-center h-20 border-b dark:border-gray-700 py-2">
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, userRole, unreadChatCount = 0, isOpen = false, onClose }) => {
+    
+    // Sidebar content component to reuse or keep clean
+    const SidebarContent = () => (
+        <div className="flex flex-col h-full bg-white dark:bg-gray-800 shadow-xl">
+            <div className="flex items-center justify-center h-20 border-b dark:border-gray-700 py-2 shrink-0">
                 <img 
                     src={SCHOOL_LOGO_URL} 
                     alt="LTS Logo" 
@@ -69,6 +73,27 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, userRole, 
                 )}
             </nav>
         </div>
+    );
+
+    return (
+        <>
+            {/* Desktop Sidebar (Static) */}
+            <div className="hidden md:flex md:w-64 md:flex-col">
+                <SidebarContent />
+            </div>
+
+            {/* Mobile Sidebar (Off-canvas) */}
+            {/* Overlay */}
+            <div 
+                className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                onClick={onClose}
+            />
+            
+            {/* Drawer */}
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <SidebarContent />
+            </div>
+        </>
     );
 };
 
