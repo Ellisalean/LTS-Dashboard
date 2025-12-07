@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../../types.ts';
 import { supabase } from '../../application/supabase.ts';
-import { SendIcon, UserCircleIcon, ChatIcon } from '../Icons.tsx';
+import { SendIcon, UserCircleIcon, ChatIcon, ChevronLeftIcon } from '../Icons.tsx';
 
 interface ChatViewProps {
     user: User;
@@ -182,10 +182,15 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
     }
 
     return (
-        <div className="flex h-[calc(100vh-8rem)] bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border dark:border-gray-700">
+        <div className="flex h-[calc(100vh-8rem)] bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border dark:border-gray-700 relative">
             
             {/* LEFT SIDEBAR (CONTACTS) */}
-            <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+            {/* Lógica Mobile: Si hay usuario seleccionado, oculta la lista en pantallas pequeñas (hidden md:flex) */}
+            {/* Si NO hay usuario, la muestra ocupando todo el ancho (w-full) */}
+            <div className={`
+                ${selectedUser ? 'hidden md:flex' : 'flex'} 
+                w-full md:w-1/3 border-r border-gray-200 dark:border-gray-700 flex-col
+            `}>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                     <h2 className="text-lg font-bold text-gray-800 dark:text-white flex items-center">
                         <ChatIcon className="w-5 h-5 mr-2 text-blue-500"/>
@@ -222,11 +227,23 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
             </div>
 
             {/* RIGHT MAIN (CHAT AREA) */}
-            <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900">
+            {/* Lógica Mobile: Si hay usuario seleccionado, muestra el chat (flex). Si no, lo oculta en móvil (hidden md:flex) */}
+            <div className={`
+                ${selectedUser ? 'flex' : 'hidden md:flex'} 
+                flex-1 flex-col bg-gray-50 dark:bg-gray-900 w-full
+            `}>
                 {selectedUser ? (
                     <>
                         {/* Chat Header */}
                         <div className="p-4 bg-white dark:bg-gray-800 shadow-sm flex items-center border-b dark:border-gray-700">
+                            {/* Botón Atrás (Solo visible en Móvil) */}
+                            <button 
+                                onClick={() => setSelectedUser(null)}
+                                className="mr-3 md:hidden p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                            >
+                                <ChevronLeftIcon className="w-6 h-6" />
+                            </button>
+
                             <img src={selectedUser.avatar_url} className="w-10 h-10 rounded-full object-cover" />
                             <div className="ml-3">
                                 <h3 className="font-bold text-gray-800 dark:text-white">{selectedUser.nombre}</h3>
@@ -277,7 +294,7 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
                         <UserCircleIcon className="w-20 h-20 mb-4 opacity-20"/>
-                        <p className="text-lg">Selecciona un contacto para chatear</p>
+                        <p className="text-lg px-4 text-center">Selecciona un contacto para iniciar la conversación</p>
                     </div>
                 )}
             </div>

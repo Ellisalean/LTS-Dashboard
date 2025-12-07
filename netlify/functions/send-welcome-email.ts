@@ -13,9 +13,14 @@ export const handler: Handler = async (event) => {
     try {
         const { email, name, password, role } = JSON.parse(event.body || '{}');
 
+        // Validación básica
         if (!email || !name || !password) {
+            console.error('Missing fields:', { email, name, hasPassword: !!password });
             return { statusCode: 400, body: JSON.stringify({ error: 'Faltan datos requeridos' }) };
         }
+
+        // Limpieza de espacios en el correo
+        const cleanEmail = email.trim();
 
         const subject = `Bienvenido al Latin Theological Seminary`;
         
@@ -74,18 +79,27 @@ export const handler: Handler = async (event) => {
         </html>
         `;
 
+        console.log(`Intentando enviar correo a: ${cleanEmail}`);
+
         const data = await resend.emails.send({
-            from: 'LTS Admin <onboarding@resend.dev>', // Usamos el dominio de pruebas de Resend por defecto
-            to: [email],
+            from: 'LTS Admin <onboarding@resend.dev>',
+            to: [cleanEmail],
             subject: subject,
             html: htmlContent,
         });
+
+        console.log('Respuesta de Resend:', data);
+
+        if (data.error) {
+             throw new Error(data.error.message);
+        }
 
         return {
             statusCode: 200,
             body: JSON.stringify(data),
         };
     } catch (error) {
+        console.error('Error en send-welcome-email:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: (error as Error).message }),
