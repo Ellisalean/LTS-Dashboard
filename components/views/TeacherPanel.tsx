@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../application/supabase.ts';
-import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon, HomeIcon } from '../Icons.tsx';
+import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon, HomeIcon, ChatIcon } from '../Icons.tsx';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
 // @ts-ignore
@@ -1104,6 +1104,95 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                                             </td>
                                         </tr>
                                     ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB CONTENT: ANNOUNCEMENTS (RESTAURADO) */}
+            {activeTab === 'announcements' && isSuperAdmin && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Formulario */}
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
+                        <h2 className="text-lg font-bold mb-4 flex items-center text-gray-800 dark:text-white">
+                            <ChatIcon className="h-5 w-5 mr-2 text-purple-500"/>
+                            Nuevo Anuncio Global
+                        </h2>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Remitente</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="Ej: Dirección Académica" 
+                                    value={newAnnounceSender} 
+                                    onChange={(e) => setNewAnnounceSender(e.target.value)} 
+                                    className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white" 
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mensaje</label>
+                                <textarea 
+                                    placeholder="Escribe el anuncio aquí..." 
+                                    value={newAnnounceContent} 
+                                    onChange={(e) => setNewAnnounceContent(e.target.value)} 
+                                    className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white h-32 resize-none"
+                                />
+                            </div>
+                            <button 
+                                onClick={handleAddAnnouncement} 
+                                disabled={!newAnnounceContent} 
+                                className="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700 disabled:opacity-50 font-bold shadow-md transition-colors"
+                            >
+                                Publicar Anuncio
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {/* Lista */}
+                    <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fecha</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Remitente</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Mensaje</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                    {announcements.map(a => (
+                                        <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                {new Date(a.fecha_envio).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                                                {a.remitente}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 max-w-xs truncate">
+                                                {a.asunto}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                {confirmDeleteAnnounceId === a.id ? (
+                                                    <div className="flex justify-end space-x-2">
+                                                        <button onClick={() => handleDeleteAnnouncement(a.id)} className="text-xs bg-red-600 text-white px-2 py-1 rounded">Borrar</button>
+                                                        <button onClick={() => setConfirmDeleteAnnounceId(null)} className="text-xs bg-gray-300 text-gray-800 px-2 py-1 rounded">X</button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => setConfirmDeleteAnnounceId(a.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {announcements.length === 0 && (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                                No hay anuncios publicados.
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
