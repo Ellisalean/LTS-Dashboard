@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../../types.ts';
 import { supabase } from '../../application/supabase.ts';
-import { SendIcon, UserCircleIcon, ChatIcon, ChevronLeftIcon } from '../Icons.tsx';
+import { SendIcon, UserCircleIcon, ChatIcon, ChevronLeftIcon, SearchIcon } from '../Icons.tsx';
 
 interface ChatViewProps {
     user: User;
@@ -31,6 +31,7 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState(''); // Estado para el buscador
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // 1. Obtener ID del usuario actual
@@ -54,7 +55,7 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
             // Estudiante ve: Admin Y Profesores
             query = query.or('rol.eq.admin,rol.eq.profesor');
         }
-        // Si es 'profesor' o 'admin', ve a todos (el query por defecto ya trae a todos menos a mí mismo)
+        // Si es 'profesor' o 'admin', ve a todos
 
         const { data: users } = await query;
         
@@ -179,35 +180,50 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
 
     const handleSelectContact = (contact: ChatUser) => {
         setSelectedUser(contact);
-        // Al hacer click, reseteamos su contador visualmente (la DB se actualiza en useEffect)
         setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, unreadCount: 0 } : c));
     }
+
+    // --- FILTRADO DE CONTACTOS ---
+    const filteredContacts = contacts.filter(contact => 
+        contact.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     return (
         <div className="flex h-[calc(100vh-8rem)] bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border dark:border-gray-700 relative">
             
             {/* LEFT SIDEBAR (CONTACTS) */}
-            {/* Lógica Mobile: Si hay usuario seleccionado, oculta la lista en pantallas pequeñas (hidden md:flex) */}
-            {/* Si NO hay usuario, la muestra ocupando todo el ancho (w-full) */}
             <div className={`
                 ${selectedUser ? 'hidden md:flex' : 'flex'} 
                 w-full md:w-1/3 border-r border-gray-200 dark:border-gray-700 flex-col
             `}>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-white flex items-center">
+                    <h2 className="text-lg font-bold text-gray-800 dark:text-white flex items-center mb-3">
                         <ChatIcon className="w-5 h-5 mr-2 text-blue-500"/>
                         Mensajes
                     </h2>
+                    
+                    {/* BARRA DE BÚSQUEDA */}
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            placeholder="Buscar contacto..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 border-none text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <SearchIcon className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"/>
+                    </div>
                 </div>
+
                 <div className="flex-1 overflow-y-auto">
-                    {contacts.map(contact => (
+                    {filteredContacts.map(contact => (
                         <div 
                             key={contact.id}
                             onClick={() => handleSelectContact(contact)}
-                            className={`flex items-center p-4 cursor-pointer hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors ${selectedUser?.id === contact.id ? 'bg-blue-100 dark:bg-gray-700 border-l-4 border-blue-500' : ''}`}
+                            className={`flex items-center p-4 cursor-pointer hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-800/50 ${selectedUser?.id === contact.id ? 'bg-blue-100 dark:bg-gray-700 border-l-4 border-blue-500' : ''}`}
                         >
                             <div className="relative">
-                                <img src={contact.avatar_url} className="w-10 h-10 rounded-full object-cover" />
+                                <img src={contact.avatar_url} className="w-12 h-12 rounded-full object-cover" />
                                 {contact.unreadCount > 0 && (
                                     <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold h-5 w-5 flex items-center justify-center rounded-full border-2 border-white dark:border-gray-800 shadow-sm animate-bounce">
                                         {contact.unreadCount}
@@ -224,12 +240,11 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
                             </div>
                         </div>
                     ))}
-                    {contacts.length === 0 && <p className="p-4 text-sm text-gray-500 text-center">No hay contactos disponibles.</p>}
+                    {filteredContacts.length === 0 && <p className="p-8 text-sm text-gray-500 text-center">No se encontraron contactos.</p>}
                 </div>
             </div>
 
             {/* RIGHT MAIN (CHAT AREA) */}
-            {/* Lógica Mobile: Si hay usuario seleccionado, muestra el chat (flex). Si no, lo oculta en móvil (hidden md:flex) */}
             <div className={`
                 ${selectedUser ? 'flex' : 'hidden md:flex'} 
                 flex-1 flex-col bg-gray-50 dark:bg-gray-900 w-full
@@ -241,7 +256,7 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
                             {/* Botón Atrás (Solo visible en Móvil) */}
                             <button 
                                 onClick={() => setSelectedUser(null)}
-                                className="mr-3 md:hidden p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                                className="mr-3 md:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
                             >
                                 <ChevronLeftIcon className="w-6 h-6" />
                             </button>
@@ -261,7 +276,7 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
                                 const isMe = msg.sender_id === currentUserId;
                                 return (
                                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[70%] px-4 py-2 rounded-2xl shadow-sm text-sm ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'}`}>
+                                        <div className={`max-w-[75%] px-4 py-2 rounded-2xl shadow-sm text-sm ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'}`}>
                                             <p>{msg.contenido}</p>
                                             <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
                                                 {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
