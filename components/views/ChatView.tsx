@@ -49,10 +49,12 @@ const ChatView: React.FC<ChatViewProps> = ({ user }) => {
     const fetchContacts = async (myRole: string, myId: string) => {
         let query = supabase.from('estudiantes').select('id, nombre, avatar_url, rol').neq('id', myId);
         
-        // Si soy estudiante, solo veo admins. Si soy admin, veo a todos.
+        // LOGICA DE VISIBILIDAD (Option C)
         if (myRole === 'estudiante') {
-            query = query.eq('rol', 'admin');
+            // Estudiante ve: Admin Y Profesores
+            query = query.or('rol.eq.admin,rol.eq.profesor');
         }
+        // Si es 'profesor' o 'admin', ve a todos (el query por defecto ya trae a todos menos a mí mismo)
 
         const { data: users } = await query;
         
