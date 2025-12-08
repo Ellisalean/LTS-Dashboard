@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../application/supabase.ts';
-import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon, HomeIcon, ChatIcon } from '../Icons.tsx';
+import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon, HomeIcon, ChatIcon, SearchIcon } from '../Icons.tsx';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
 // @ts-ignore
 import autoTable from 'jspdf-autotable';
 import { User } from '../../types.ts';
+import { DEGREE_PROGRAM_NAME } from '../../constants.ts';
 
 interface StudentData {
     id: string;
@@ -103,6 +104,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
     // --- ESTADO ESTUDIANTES ---
     const [students, setStudents] = useState<StudentData[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
+    const [studentSearchTerm, setStudentSearchTerm] = useState(''); // ESTADO PARA EL BUSCADOR
     
     // Estados para Edición de Perfil
     const [editPhotoUrl, setEditPhotoUrl] = useState('');
@@ -462,6 +464,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             doc.setLineWidth(0.5);
             doc.line(14, 38, 196, 38);
             
+            // Información del Estudiante
             doc.setFontSize(11);
             doc.setTextColor(50);
             doc.text(`Nombre del Alumno:`, 14, 50);
@@ -475,6 +478,12 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             doc.text(`Fecha de Emisión:`, 14, 66);
             doc.text(new Date().toLocaleDateString(), 55, 66);
 
+            // INFORMACIÓN DEL PROGRAMA DE ESTUDIOS (NUEVO)
+            doc.setFont("helvetica", "bold");
+            doc.text(`Programa:`, 14, 74);
+            doc.setFont("helvetica", "normal");
+            doc.text(DEGREE_PROGRAM_NAME, 55, 74);
+
             const tableData = studentGrades.map(g => [
                 coursesList.find(c => c.id === g.curso_id)?.nombre || g.curso_id,
                 g.titulo_asignacion,
@@ -482,7 +491,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             ]);
 
             autoTableFunc(doc, {
-                startY: 75,
+                startY: 82, // Bajamos un poco la tabla para dar espacio al programa
                 head: [['Materia / Curso', 'Evaluación', 'Calificación']],
                 body: tableData,
                 theme: 'striped',
@@ -605,6 +614,12 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
         }
     };
 
+    // --- FILTRADO DE ESTUDIANTES ---
+    const filteredStudents = students.filter(student => 
+        student.nombre.toLowerCase().includes(studentSearchTerm.toLowerCase()) ||
+        (student.email && student.email.toLowerCase().includes(studentSearchTerm.toLowerCase()))
+    );
+
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando panel de administración...</div>;
 
@@ -644,6 +659,13 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                         
                         <div className="flex flex-col items-center space-y-4 mb-6">
                             <img src={editPhotoUrl || selectedStudent.avatar_url} className="w-32 h-32 rounded-full object-cover border-4 border-blue-500" />
+                            {/* MOSTRAR PROGRAMA ACADÉMICO */}
+                            <div className="text-center px-4">
+                                <span className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wide">
+                                    {selectedStudent.rol || 'Estudiante'}
+                                </span>
+                                <p className="text-gray-600 dark:text-gray-300 font-medium">{DEGREE_PROGRAM_NAME}</p>
+                            </div>
                         </div>
 
                         {/* FORMULARIO DE EDICIÓN (SOLO ADMIN) */}
@@ -672,7 +694,6 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                         ) : (
                             <div className="text-center">
                                 <p className="text-gray-600 dark:text-gray-400">{selectedStudent.email}</p>
-                                <p className="text-sm text-gray-500 capitalize">{selectedStudent.rol}</p>
                             </div>
                         )}
                     </div>
@@ -833,17 +854,29 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             {/* TAB CONTENT: STUDENTS */}
             {activeTab === 'students' && (
                 <div className="space-y-4">
-                    {isSuperAdmin && (
-                        <div className="flex justify-end">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        {/* BUSCADOR DE ESTUDIANTES (NUEVO) */}
+                        <div className="relative w-full md:w-96">
+                            <input 
+                                type="text" 
+                                placeholder="Buscar alumno por nombre o correo..." 
+                                value={studentSearchTerm}
+                                onChange={(e) => setStudentSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            />
+                            <SearchIcon className="w-5 h-5 absolute left-3 top-2.5 text-gray-400"/>
+                        </div>
+
+                        {isSuperAdmin && (
                             <button 
                                 onClick={() => setIsCreatingStudent(!isCreatingStudent)} 
-                                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center shadow-sm"
+                                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center shadow-sm whitespace-nowrap"
                             >
                                 <PlusIcon className="h-5 w-5 mr-2"/>
-                                {isCreatingStudent ? 'Cancelar Registro' : 'Registrar Usuario'}
+                                {isCreatingStudent ? 'Cancelar' : 'Registrar Usuario'}
                             </button>
-                        </div>
-                    )}
+                        )}
+                    </div>
 
                     {isCreatingStudent && isSuperAdmin && (
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-green-200 dark:border-green-900 animate-fade-in">
@@ -881,7 +914,8 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {students.map((student) => (
+                                    {/* SE USA LA LISTA FILTRADA */}
+                                    {filteredStudents.map((student) => (
                                         <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                             <td className="px-6 py-4 whitespace-nowrap flex items-center">
                                                 <img className="h-8 w-8 rounded-full object-cover mr-3" src={student.avatar_url} />
@@ -928,6 +962,13 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                                             </td>
                                         </tr>
                                     ))}
+                                    {filteredStudents.length === 0 && (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                                No se encontraron estudiantes con ese criterio.
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>

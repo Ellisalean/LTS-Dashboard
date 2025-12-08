@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { User, CalendarEvent, Message } from '../../types.ts';
 import { CalendarIcon, MailIcon, ClockIcon } from '../Icons.tsx';
+import { DEGREE_PROGRAM_NAME } from '../../constants.ts';
 
 interface HomeProps {
     user: User;
@@ -9,11 +11,19 @@ interface HomeProps {
 }
 
 const WelcomeHeader: React.FC<{ user: User }> = ({ user }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center space-x-6">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6 text-center md:text-left">
         <img className="h-24 w-24 rounded-full object-cover ring-4 ring-blue-500" src={user.avatarUrl} alt="User Avatar" />
         <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">¡Bienvenido, {user.name.split(' ')[0]}!</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Es un gusto tenerte de vuelta. Aquí está tu resumen de hoy.</p>
+            
+            {/* NOMBRE DEL PROGRAMA ACADÉMICO */}
+            <div className="mt-2 mb-2 inline-block bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-lg border border-blue-100 dark:border-blue-800">
+                <p className="text-blue-700 dark:text-blue-300 font-bold text-xs tracking-wider uppercase">
+                    {DEGREE_PROGRAM_NAME}
+                </p>
+            </div>
+
+            <p className="text-gray-600 dark:text-gray-400">Es un gusto tenerte de vuelta. Aquí está tu resumen de hoy.</p>
         </div>
     </div>
 );

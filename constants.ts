@@ -1,8 +1,12 @@
+
 import { User, Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus } from './types.ts';
 import { RAW_DATA } from './application/data.ts';
 
 // Centralized Logo URL
 export const SCHOOL_LOGO_URL = "https://cdn.myportfolio.com/d435fa58-d32c-4141-8a15-0f2bfccdea41/1ac05fb8-e508-4c03-b550-d2b907caadbd_rw_600.png?h=7572d326e4292f32557ac73606fd0ece";
+
+// Official Program Name
+export const DEGREE_PROGRAM_NAME = "PROGRAMA DE LICENCIATURA: Teología y Ministerio Cristiano";
 
 // Helper to clean keys with spaces and other inconsistencies
 const cleanData = (data: any[]) => {
