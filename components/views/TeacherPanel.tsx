@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../application/supabase.ts';
 import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon, HomeIcon, ChatIcon, SearchIcon, CurrencyDollarIcon, CreditCardIcon } from '../Icons.tsx';
@@ -170,6 +169,8 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
     const [newPayDesc, setNewPayDesc] = useState('Mensualidad');
     const [newPayMethod, setNewPayMethod] = useState('Zelle');
     const [newPayRef, setNewPayRef] = useState('');
+    // NUEVO: Estado para fecha manual del pago
+    const [newPayDate, setNewPayDate] = useState(new Date().toISOString().split('T')[0]);
 
     // CARGA INICIAL
     useEffect(() => {
@@ -323,15 +324,20 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
 
     const handleDeleteStudent = async (id: string) => {
         if (!isSuperAdmin) return;
+        
+        // Confirmación adicional para evitar accidentes
+        if (!confirm("⚠️ ADVERTENCIA: Esta acción eliminará al estudiante y TODOS sus datos relacionados (Notas, Pagos, Asistencias, Chat). ¿Estás seguro?")) return;
+
         const { error } = await supabase.from('estudiantes').delete().eq('id', id);
         
         if (!error) {
+            alert("✅ Estudiante eliminado completamente del sistema.");
             fetchStudents();
             setConfirmDeleteStudentId(null);
             if (selectedStudent?.id === id) setSelectedStudent(null);
         } else {
             if (error.message.includes('foreign key constraint')) {
-                alert("No se puede borrar el usuario porque tiene notas, asignaciones o mensajes asociados. Borra sus registros primero.");
+                alert("AVISO DE SEGURIDAD: No se puede borrar porque hay registros asociados en una tabla no configurada (probablemente CHAT). Ejecuta el SQL de 'Chat Cascade' en Supabase.");
             } else {
                 alert("Error al borrar: " + error.message);
             }
@@ -457,13 +463,14 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
     // --- HANDLER PAGOS (NUEVO) ---
     const handleAddPayment = async () => {
         if(!financeStudent) return;
+        if(!newPayDate) { alert("Por favor selecciona una fecha válida."); return; }
         
         const type = newPayDesc.toLowerCase().includes('inscrip') ? 'inscription' : 'tuition';
 
         const { error } = await supabase.from('pagos').insert({
             student_id: financeStudent,
             amount: newPayAmount,
-            date: new Date().toISOString(),
+            date: new Date(newPayDate).toISOString(), // Usar fecha manual
             description: newPayDesc,
             method: newPayMethod,
             reference: newPayRef,
@@ -1356,6 +1363,16 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                                         <label className="text-xs font-bold text-gray-500 uppercase">Monto ($)</label>
                                         <input type="number" value={newPayAmount} onChange={(e) => setNewPayAmount(Number(e.target.value))} className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white" />
                                     </div>
+                                    {/* CAMBIO: INPUT DE FECHA AÑADIDO */}
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Fecha de Pago</label>
+                                        <input 
+                                            type="date" 
+                                            value={newPayDate} 
+                                            onChange={(e) => setNewPayDate(e.target.value)} 
+                                            className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white"
+                                        />
+                                    </div>
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase">Concepto</label>
                                         <input type="text" value={newPayDesc} onChange={(e) => setNewPayDesc(e.target.value)} className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white" placeholder="Mensualidad Enero" />
@@ -1363,6 +1380,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase">Método</label>
                                         <select value={newPayMethod} onChange={(e) => setNewPayMethod(e.target.value)} className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white">
+                                            <option>Pago Móvil</option>
                                             <option>Zelle</option>
                                             <option>Efectivo</option>
                                             <option>Transferencia</option>

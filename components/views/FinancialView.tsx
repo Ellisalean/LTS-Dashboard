@@ -65,14 +65,14 @@ const FinancialView: React.FC<FinancialViewProps> = ({ user }) => {
         fetchFinancialData();
     }, [user]);
 
-    // Helpers para visualización
-    const getTrimester = (dateStr: string) => {
-        const d = new Date(dateStr);
-        const month = d.getMonth(); // 0-11
-        if (month >= 8 && month <= 11) return 'Sept - Dic'; // Sept(8) - Dec(11)
-        if (month >= 0 && month <= 2) return 'Ene - Mar';
-        if (month >= 3 && month <= 5) return 'Abr - Jun';
-        return 'Vacacional';
+    // Helper para obtener el nombre del mes
+    const getMonthName = (dateStr: string) => {
+        const date = new Date(dateStr);
+        // Ajuste zona horaria para evitar desfase de días
+        const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+        const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
+        
+        return new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(adjustedDate);
     };
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando información financiera...</div>;
@@ -113,11 +113,11 @@ const FinancialView: React.FC<FinancialViewProps> = ({ user }) => {
                 </div>
 
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-purple-500">
-                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Métodos de Pago</p>
-                     <div className="mt-3 flex space-x-2">
+                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Métodos Aceptados</p>
+                     <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded text-gray-600 dark:text-gray-300">Pago Móvil</span>
                         <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded text-gray-600 dark:text-gray-300">Zelle</span>
                         <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded text-gray-600 dark:text-gray-300">Efectivo</span>
-                        <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded text-gray-600 dark:text-gray-300">Transferencia</span>
                      </div>
                      <p className="text-xs text-gray-400 mt-2">Reporta tu pago en administración</p>
                 </div>
@@ -138,7 +138,7 @@ const FinancialView: React.FC<FinancialViewProps> = ({ user }) => {
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fecha</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Concepto</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Trimestre</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Mes</th>
                                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Método</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Monto</th>
                             </tr>
@@ -155,8 +155,8 @@ const FinancialView: React.FC<FinancialViewProps> = ({ user }) => {
                                             {pay.type === 'inscription' && <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-yellow-100 text-yellow-800 uppercase">Inscripción</span>}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
-                                                {getTrimester(pay.date)}
+                                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 capitalize">
+                                                {getMonthName(pay.date)}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500 dark:text-gray-400">
