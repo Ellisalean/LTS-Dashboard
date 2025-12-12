@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { User, View } from '../types.ts';
 import Sidebar from './Sidebar.tsx';
@@ -11,6 +12,7 @@ import Grades from './views/Grades.tsx';
 import TeacherPanel from './views/TeacherPanel.tsx';
 import AttendanceView from './views/AttendanceView.tsx';
 import ChatView from './views/ChatView.tsx';
+import FinancialView from './views/FinancialView.tsx'; // Import nuevo
 import { useRealtimeData } from '../hooks/useData.ts';
 
 interface DashboardProps {
@@ -50,6 +52,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 return <AttendanceView user={user} />;
             case View.Chat:
                 return <ChatView user={user} />;
+            case View.Financial:
+                return <FinancialView user={user} />; // Vista nueva
             case View.TeacherPanel:
                 return <TeacherPanel user={user} />;
             default:

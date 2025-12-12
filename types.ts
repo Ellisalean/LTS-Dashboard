@@ -81,6 +81,18 @@ export interface Attendance {
     status: 'presente' | 'ausente' | 'justificado';
 }
 
+export interface Payment {
+    id: string;
+    student_id: string;
+    amount: number;
+    date: string;
+    description: string; // "Inscripción", "Mensualidad Septiembre", etc.
+    method: string; // "Zelle", "Efectivo", "Transferencia"
+    reference?: string;
+    type: 'inscription' | 'tuition' | 'other';
+    verified: boolean;
+}
+
 export enum View {
   Home = 'Inicio',
   Courses = 'Cursos',
@@ -89,5 +101,6 @@ export enum View {
   Grades = 'Notas',
   Attendance = 'Asistencia',
   Chat = 'Mensajería',
+  Financial = 'Estado Financiero',
   TeacherPanel = 'Panel Profesor'
 }

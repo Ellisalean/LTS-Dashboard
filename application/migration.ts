@@ -1,3 +1,5 @@
+
+
 import { supabase } from './supabase.ts';
 import { RAW_DATA } from './data.ts';
 
@@ -24,6 +26,16 @@ export const migrateDataToSupabase = async (log: (msg: string) => void) => {
              throw new Error(`No se pudo conectar a la tabla 'estudiantes'. ¿Ejecutaste el script SQL en Supabase? Error: ${healthError.message}`);
         }
         log("Conexión exitosa. Tablas detectadas.");
+
+        // NEW: Check/Create Payments Table (Conceptually - actually we just check if we can select from it)
+        // Since Supabase doesn't allow CREATE TABLE via JS Client typically without SQL functions, 
+        // we assume the user might need to run SQL if it fails. 
+        // However, we can try to insert a dummy payment if it exists to verify.
+        const { error: paymentCheck } = await supabase.from('pagos').select('count', { count: 'exact', head: true });
+        if (paymentCheck && paymentCheck.code === '42P01') {
+            log("⚠️ LA TABLA 'pagos' NO EXISTE. Por favor ejecuta el SQL en Supabase Editor.");
+            log("SQL: create table pagos (id uuid default gen_random_uuid() primary key, student_id uuid references estudiantes(id) on delete cascade, amount numeric, date date, description text, method text, reference text, type text, verified boolean default true, created_at timestamptz default now());");
+        }
 
         // 1. Migrar Estudiantes
         log("Procesando Estudiantes...");

@@ -1,12 +1,13 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../application/supabase.ts';
-import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon, HomeIcon, ChatIcon, SearchIcon } from '../Icons.tsx';
+import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon, HomeIcon, ChatIcon, SearchIcon, CurrencyDollarIcon, CreditCardIcon } from '../Icons.tsx';
 // @ts-ignore
 import { jsPDF } from 'jspdf';
 // @ts-ignore
 import autoTable from 'jspdf-autotable';
-import { User } from '../../types.ts';
+import { User, Payment } from '../../types.ts';
 import { DEGREE_PROGRAM_NAME } from '../../constants.ts';
 
 interface StudentData {
@@ -97,7 +98,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
     const isTeacher = user.role === 'profesor';
 
     // ESTADO GENERAL
-    const [activeTab, setActiveTab] = useState<'students' | 'assignments' | 'exams' | 'attendance' | 'announcements' | 'courses'>('students');
+    const [activeTab, setActiveTab] = useState<'students' | 'assignments' | 'exams' | 'attendance' | 'announcements' | 'courses' | 'finance'>('students');
     const [coursesList, setCoursesList] = useState<{id: string, nombre: string}[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -159,6 +160,16 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
     // --- ESTADO CURSOS (NUEVO) ---
     const [adminCourses, setAdminCourses] = useState<CourseAdminData[]>([]);
     const [editingCourse, setEditingCourse] = useState<CourseAdminData | null>(null);
+
+    // --- ESTADO FINANZAS (NUEVO) ---
+    const [financeStudent, setFinanceStudent] = useState(''); // ID seleccionado
+    const [studentPayments, setStudentPayments] = useState<Payment[]>([]);
+    const [financeStats, setFinanceStats] = useState({ paid: 0, debt: 0 });
+    // Formulario Pago
+    const [newPayAmount, setNewPayAmount] = useState(20);
+    const [newPayDesc, setNewPayDesc] = useState('Mensualidad');
+    const [newPayMethod, setNewPayMethod] = useState('Zelle');
+    const [newPayRef, setNewPayRef] = useState('');
 
     // CARGA INICIAL
     useEffect(() => {
@@ -253,6 +264,24 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             }
         }
     };
+
+    const fetchStudentPayments = async (studentId: string) => {
+        const { data } = await supabase.from('pagos').select('*').eq('student_id', studentId).order('date', { ascending: false });
+        const payments = (data || []) as Payment[];
+        setStudentPayments(payments);
+
+        // Calc Debt
+        const startDate = new Date('2024-09-01');
+        const now = new Date();
+        let monthsDiff = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
+        if (monthsDiff < 0) monthsDiff = 0;
+        const totalMonths = monthsDiff + 1; 
+
+        const expectedTotal = 10 + (20 * totalMonths);
+        const totalPaid = payments.reduce((acc, curr) => acc + curr.amount, 0);
+
+        setFinanceStats({ paid: totalPaid, debt: expectedTotal - totalPaid });
+    }
 
     // --- HANDLERS ESTUDIANTES ---
     const handleSelectStudent = (student: StudentData) => {
@@ -424,6 +453,38 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             alert('Error al actualizar curso: ' + error.message);
         }
     };
+
+    // --- HANDLER PAGOS (NUEVO) ---
+    const handleAddPayment = async () => {
+        if(!financeStudent) return;
+        
+        const type = newPayDesc.toLowerCase().includes('inscrip') ? 'inscription' : 'tuition';
+
+        const { error } = await supabase.from('pagos').insert({
+            student_id: financeStudent,
+            amount: newPayAmount,
+            date: new Date().toISOString(),
+            description: newPayDesc,
+            method: newPayMethod,
+            reference: newPayRef,
+            type: type,
+            verified: true
+        });
+
+        if(!error) {
+            fetchStudentPayments(financeStudent);
+            setNewPayRef('');
+            alert("Pago registrado correctamente.");
+        } else {
+            alert("Error al registrar pago: " + error.message);
+        }
+    };
+
+    const handleDeletePayment = async (id: string) => {
+        if(!confirm("¿Seguro que deseas eliminar este registro de pago?")) return;
+        await supabase.from('pagos').delete().eq('id', id);
+        if(financeStudent) fetchStudentPayments(financeStudent);
+    }
 
     // --- PDF GENERATOR ---
     const handleDownloadReport = async () => {
@@ -756,6 +817,9 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                 <button onClick={() => setActiveTab('assignments')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'assignments' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asignaciones</button>
                 <button onClick={() => setActiveTab('exams')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'exams' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Exámenes</button>
                 <button onClick={() => setActiveTab('attendance')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'attendance' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asistencia</button>
+                {isSuperAdmin && (
+                    <button onClick={() => setActiveTab('finance')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'finance' ? 'bg-white text-green-600 shadow-sm dark:bg-gray-800 dark:text-green-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Finanzas</button>
+                )}
                 {isSuperAdmin && (
                     <button onClick={() => setActiveTab('announcements')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Anuncios</button>
                 )}
@@ -1231,6 +1295,136 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                                         <tr>
                                             <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
                                                 No hay anuncios publicados.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB CONTENT: FINANCE (NUEVO) */}
+            {activeTab === 'finance' && isSuperAdmin && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+                    {/* PANEL IZQUIERDO: SELECCIÓN Y FORMULARIO */}
+                    <div className="space-y-6">
+                        {/* Selector de Estudiante */}
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                            <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white flex items-center">
+                                <SearchIcon className="h-5 w-5 mr-2 text-blue-500"/>
+                                Seleccionar Alumno
+                            </h2>
+                            <select 
+                                value={financeStudent} 
+                                onChange={(e) => {
+                                    setFinanceStudent(e.target.value);
+                                    fetchStudentPayments(e.target.value);
+                                }}
+                                className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white"
+                            >
+                                <option value="">-- Elige un estudiante --</option>
+                                {students.filter(s => s.rol === 'estudiante').map(s => (
+                                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                                ))}
+                            </select>
+
+                            {/* Resumen Rápido si hay seleccionado */}
+                            {financeStudent && (
+                                <div className="mt-6 pt-6 border-t dark:border-gray-700">
+                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pagado</p>
+                                    <p className="text-2xl font-bold text-gray-800 dark:text-white">${financeStats.paid}</p>
+                                    
+                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-4">Deuda Actual</p>
+                                    <p className={`text-2xl font-bold ${financeStats.debt > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                        ${financeStats.debt}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Formulario de Pago */}
+                        {financeStudent && (
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                                <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white flex items-center">
+                                    <CurrencyDollarIcon className="h-5 w-5 mr-2 text-green-500"/>
+                                    Registrar Pago
+                                </h2>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Monto ($)</label>
+                                        <input type="number" value={newPayAmount} onChange={(e) => setNewPayAmount(Number(e.target.value))} className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Concepto</label>
+                                        <input type="text" value={newPayDesc} onChange={(e) => setNewPayDesc(e.target.value)} className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white" placeholder="Mensualidad Enero" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Método</label>
+                                        <select value={newPayMethod} onChange={(e) => setNewPayMethod(e.target.value)} className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white">
+                                            <option>Zelle</option>
+                                            <option>Efectivo</option>
+                                            <option>Transferencia</option>
+                                            <option>Tarjeta (POS)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Referencia</label>
+                                        <input type="text" value={newPayRef} onChange={(e) => setNewPayRef(e.target.value)} className="w-full p-2 rounded border dark:bg-gray-700 dark:text-white" placeholder="#123456" />
+                                    </div>
+                                    <button onClick={handleAddPayment} className="w-full bg-green-600 text-white py-2 rounded font-bold hover:bg-green-700 mt-2">
+                                        Procesar Pago
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* PANEL DERECHO: HISTORIAL */}
+                    <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
+                         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900">
+                            <h3 className="font-bold text-gray-800 dark:text-white">Historial de Transacciones</h3>
+                        </div>
+                        <div className="flex-1 overflow-auto">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fecha</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Concepto</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Método</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Monto</th>
+                                        <th className="px-6 py-3 text-right"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                    {studentPayments.length > 0 ? (
+                                        studentPayments.map(p => (
+                                            <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                                    {new Date(p.date).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
+                                                    {p.description}
+                                                    {p.type === 'inscription' && <span className="ml-2 px-1 bg-yellow-100 text-yellow-800 text-[10px] rounded uppercase">Inscripción</span>}
+                                                </td>
+                                                <td className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                    {p.method} <br/> <span className="text-[10px]">{p.reference}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right text-sm font-bold text-green-600">
+                                                    ${p.amount}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button onClick={() => handleDeletePayment(p.id)} className="text-gray-400 hover:text-red-500">
+                                                        <TrashIcon className="h-4 w-4"/>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={5} className="p-8 text-center text-gray-500">
+                                                {financeStudent ? "No hay pagos registrados." : "Selecciona un estudiante para ver su historial."}
                                             </td>
                                         </tr>
                                     )}

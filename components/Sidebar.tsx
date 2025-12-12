@@ -1,8 +1,9 @@
 
+
 import React from 'react';
 import { View } from '../types.ts';
 import { SCHOOL_LOGO_URL } from '../constants.ts';
-import { HomeIcon, BookOpenIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon, UserGroupIcon, CheckIcon, ChatIcon } from './Icons.tsx';
+import { HomeIcon, BookOpenIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon, UserGroupIcon, CheckIcon, ChatIcon, CurrencyDollarIcon } from './Icons.tsx';
 
 interface SidebarProps {
     activeView: View;
@@ -20,6 +21,7 @@ const navItems = [
     { view: View.Exams, icon: AcademicCapIcon, label: 'Exámenes' },
     { view: View.Grades, icon: ChartBarIcon, label: 'Notas' },
     { view: View.Attendance, icon: CheckIcon, label: 'Asistencia' },
+    { view: View.Financial, icon: CurrencyDollarIcon, label: 'Estado Financiero' }, // NUEVO
     { view: View.Chat, icon: ChatIcon, label: 'Mensajería' },
 ];
 
