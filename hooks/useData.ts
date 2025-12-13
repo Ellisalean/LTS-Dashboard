@@ -160,18 +160,19 @@ export const useRealtimeData = (user: User | null) => {
                     const { data: paymentData } = await supabase.from('pagos').select('*').eq('student_id', userId);
                     const allPayments = (paymentData || []) as Payment[];
                     
-                    // CONFIGURACIÓN DINÁMICA
-                    const planConfig = allPayments.find(p => p.type === 'plan_config');
+                    // CONFIGURACIÓN DINÁMICA (CORREGIDA PARA TYPE 'OTHER')
+                    const planConfig = allPayments.find(p => p.type === 'other' && p.description === 'Configuración Plan Mensual');
+                    
                     const monthlyFee = planConfig ? planConfig.amount : 25;
                     // Recuperar fecha de inicio configurada o usar default (OCTUBRE)
-                    let startDate = new Date('2024-10-01'); // CAMBIO: Default Octubre
+                    let startDate = new Date('2024-10-01'); // Default Octubre
                     if(planConfig && planConfig.date) {
                          startDate = new Date(planConfig.date);
                     }
 
                     // Calcular pagado (sin el registro de config)
                     const totalPaid = allPayments
-                        .filter(p => p.type !== 'plan_config')
+                        .filter(p => !(p.type === 'other' && p.description === 'Configuración Plan Mensual'))
                         .reduce((acc, curr) => acc + curr.amount, 0);
 
                     // Lógica Dinámica
@@ -180,7 +181,7 @@ export const useRealtimeData = (user: User | null) => {
                     if (monthsDiff < 0) monthsDiff = 0;
                     const totalMonths = monthsDiff + 1; // +1 incluye mes corriente
 
-                    const expected = 10 + (monthlyFee * totalMonths); // $10 ins + $20 * meses
+                    const expected = 10 + (monthlyFee * totalMonths); // $10 ins + $Plan * meses
                     const debt = Math.max(0, expected - totalPaid);
                     
                     financialStatus = {

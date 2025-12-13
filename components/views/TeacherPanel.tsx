@@ -278,7 +278,9 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
         const { data } = await supabase.from('pagos').select('*').eq('student_id', studentId).order('date', { ascending: false });
         const allRecords = (data || []) as Payment[];
         
-        const planConfig = allRecords.find(r => r.type === 'plan_config');
+        // CORRECCIÓN: BUSCAR POR TIPO 'OTHER' Y DESCRIPCIÓN ESPECÍFICA
+        const planConfig = allRecords.find(r => r.type === 'other' && r.description === 'Configuración Plan Mensual');
+        
         if (planConfig) {
             setCalcMonthlyFee(planConfig.amount);
             if(planConfig.date) {
@@ -286,10 +288,11 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             }
         } else {
             setCalcMonthlyFee(25);
-            setCalcStartDate('2024-10-01'); // CAMBIO: Default Octubre
+            setCalcStartDate('2024-10-01'); // Default Octubre
         }
 
-        setStudentPayments(allRecords.filter(r => r.type !== 'plan_config'));
+        // Filtrar config para la lista visual
+        setStudentPayments(allRecords.filter(r => !(r.type === 'other' && r.description === 'Configuración Plan Mensual')));
     }
 
     // ... handlers ...
@@ -476,15 +479,21 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
         if(financeStudent) fetchStudentPayments(financeStudent);
     }
 
-    // MODIFICADO: AHORA GUARDA EL VALOR DEL INPUT (state)
+    // MODIFICADO: AHORA GUARDA CON TIPO 'OTHER' PARA EVITAR EL CHECK CONSTRAINT
     const handleSavePlanConfig = async () => {
         if (!financeStudent) return;
         
-        await supabase.from('pagos').delete().eq('student_id', financeStudent).eq('type', 'plan_config');
+        // Borrar config anterior (usando type 'other' y descripción específica)
+        await supabase.from('pagos')
+            .delete()
+            .eq('student_id', financeStudent)
+            .eq('type', 'other')
+            .eq('description', 'Configuración Plan Mensual');
+
         const { error } = await supabase.from('pagos').insert({
             student_id: financeStudent,
             amount: calcMonthlyFee, // Usa el valor del estado (input manual)
-            type: 'plan_config',
+            type: 'other', // CAMBIO: Usar 'other' que es válido en la DB
             description: 'Configuración Plan Mensual',
             date: new Date(calcStartDate).toISOString(),
             method: 'SISTEMA',
@@ -492,6 +501,8 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
         });
         if (!error) {
             alert("Configuración de plan guardada correctamente.");
+            // Recargar para verificar
+            fetchStudentPayments(financeStudent);
         } else {
             alert("Error guardando plan: " + error.message);
         }
@@ -550,6 +561,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando panel de administración...</div>;
 
+    // ... (el renderizado permanece igual) ...
     // ... VISTAS ...
     if (selectedStudent && activeTab === 'students') {
         return (

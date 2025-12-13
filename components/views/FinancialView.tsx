@@ -36,20 +36,21 @@ const FinancialView: React.FC<FinancialViewProps> = ({ user }) => {
 
             const allRecords = (paymentData || []) as Payment[];
             
-            // A. BUSCAR CONFIGURACIÓN DEL PLAN (Guardado como un registro especial tipo 'plan_config')
-            const planConfigRecord = allRecords.find(p => p.type === 'plan_config');
-            const currentFee = planConfigRecord ? planConfigRecord.amount : 25; // Default $25 si no ha sido configurado por admin
+            // A. BUSCAR CONFIGURACIÓN DEL PLAN (Usando type 'other' y descripción específica)
+            const planConfigRecord = allRecords.find(r => r.type === 'other' && r.description === 'Configuración Plan Mensual');
+            
+            const currentFee = planConfigRecord ? planConfigRecord.amount : 25; // Default $25 si no ha sido configurado
             
             // CRUCIAL: Utilizar fecha de inicio configurada o fallback a OCTUBRE
-            let startDate = new Date('2024-10-01'); // CAMBIO: Inicio oficial Octubre
+            let startDate = new Date('2024-10-01'); // Inicio oficial Octubre
             if(planConfigRecord && planConfigRecord.date) {
                 startDate = new Date(planConfigRecord.date);
             }
 
             setMonthlyFee(currentFee);
 
-            // B. FILTRAR SOLO PAGOS REALES (Excluir configuraciones)
-            const realPayments = allRecords.filter(p => p.type !== 'plan_config');
+            // B. FILTRAR SOLO PAGOS REALES (Excluir configuración)
+            const realPayments = allRecords.filter(r => !(r.type === 'other' && r.description === 'Configuración Plan Mensual'));
 
             // 3. Calcular Deuda Esperada (Lógica del Negocio)
             const now = new Date();
@@ -111,10 +112,11 @@ const FinancialView: React.FC<FinancialViewProps> = ({ user }) => {
                     </p>
                 </div>
 
-                {/* VISUALIZADOR DE PLAN (SOLO LECTURA) */}
-                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <span className="text-xs font-bold text-gray-500 uppercase">Tu Plan Asignado:</span>
-                    <span className="text-lg font-bold text-gray-800 dark:text-white">${monthlyFee}/mes</span>
+                {/* RECORDATORIO DE PAGO (REEMPLAZA AL PLAN ASIGNADO) */}
+                <div className="hidden md:block text-right">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                        Recuerda enviar tu comprobante de pago<br/>antes del día 5 de cada mes.
+                    </p>
                 </div>
             </div>
 
@@ -154,7 +156,8 @@ const FinancialView: React.FC<FinancialViewProps> = ({ user }) => {
                                  <ExclamationTriangleIcon className="h-4 w-4 mr-1"/>
                                  {stats.monthsPending} {stats.monthsPending === 1 ? 'Cuota pendiente' : 'Cuotas pendientes'}
                              </p>
-                             <p className="text-[10px] text-red-500 mt-1 opacity-80">Calculado sobre plan de ${monthlyFee} (Desde Octubre)</p>
+                             {/* CAMBIO: Muestra el plan real calculado, no texto fijo */}
+                             <p className="text-[10px] text-red-500 mt-1 opacity-80">Calculado sobre plan de ${monthlyFee}</p>
                          </div>
                     )}
                 </div>
