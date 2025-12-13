@@ -89,7 +89,7 @@ export interface Payment {
     description: string; // "Inscripción", "Mensualidad Septiembre", etc.
     method: string; // "Zelle", "Efectivo", "Transferencia"
     reference?: string;
-    type: 'inscription' | 'tuition' | 'other';
+    type: 'inscription' | 'tuition' | 'other' | 'plan_config';
     verified: boolean;
 }
 

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../application/supabase.ts';
 import { PencilIcon, UserGroupIcon, PlusIcon, TrashIcon, ClipboardListIcon, AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, BookOpenIcon, HomeIcon, ChatIcon, SearchIcon, CurrencyDollarIcon, CreditCardIcon } from '../Icons.tsx';
@@ -155,6 +156,9 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
     const [newAnnounceSender, setNewAnnounceSender] = useState('Dirección Académica');
     const [newAnnounceContent, setNewAnnounceContent] = useState('');
     const [confirmDeleteAnnounceId, setConfirmDeleteAnnounceId] = useState<string | null>(null);
+    
+    // Estado para Toggle de Recordatorios (Persistencia Local para demo)
+    const [remindersEnabled, setRemindersEnabled] = useState(localStorage.getItem('LTS_PAYMENT_REMINDERS') !== 'false');
 
     // --- ESTADO CURSOS (NUEVO) ---
     const [adminCourses, setAdminCourses] = useState<CourseAdminData[]>([]);
@@ -163,13 +167,17 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
     // --- ESTADO FINANZAS (NUEVO) ---
     const [financeStudent, setFinanceStudent] = useState(''); // ID seleccionado
     const [studentPayments, setStudentPayments] = useState<Payment[]>([]);
-    const [financeStats, setFinanceStats] = useState({ paid: 0, debt: 0 });
+    const [financeStats, setFinanceStats] = useState({ paid: 0, debt: 0, expected: 0 });
+    
+    // Configuración dinámica de cálculo financiero
+    const [calcMonthlyFee, setCalcMonthlyFee] = useState(25); // Default $25
+    const [calcStartDate, setCalcStartDate] = useState('2024-09-01'); // Default Sept 2024
+
     // Formulario Pago
     const [newPayAmount, setNewPayAmount] = useState(20);
     const [newPayDesc, setNewPayDesc] = useState('Mensualidad');
     const [newPayMethod, setNewPayMethod] = useState('Zelle');
     const [newPayRef, setNewPayRef] = useState('');
-    // NUEVO: Estado para fecha manual del pago
     const [newPayDate, setNewPayDate] = useState(new Date().toISOString().split('T')[0]);
 
     // CARGA INICIAL
@@ -189,6 +197,33 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
         if (activeTab === 'announcements' && isSuperAdmin) fetchAnnouncements();
         if (activeTab === 'courses') fetchAdminCourses();
     }, [activeTab]);
+
+    // --- EFECTO PARA RECALCULAR DEUDA DINAMICAMENTE ---
+    useEffect(() => {
+        if (financeStudent) {
+            calculateFinanceStats();
+        }
+    }, [financeStudent, studentPayments, calcMonthlyFee, calcStartDate]);
+
+    const calculateFinanceStats = () => {
+        const startDate = new Date(calcStartDate);
+        const now = new Date();
+        
+        // Calcular meses transcurridos desde la fecha de inicio configurada
+        let monthsDiff = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
+        if (monthsDiff < 0) monthsDiff = 0;
+        const totalMonths = monthsDiff + 1; // Incluye el mes corriente
+
+        const inscriptionFee = 10;
+        const expectedTotal = inscriptionFee + (calcMonthlyFee * totalMonths);
+        const totalPaid = studentPayments.reduce((acc, curr) => acc + curr.amount, 0);
+
+        setFinanceStats({ 
+            paid: totalPaid, 
+            debt: expectedTotal - totalPaid,
+            expected: expectedTotal
+        });
+    };
 
     // --- FETCHERS ---
     const fetchCourses = async () => {
@@ -268,20 +303,23 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
 
     const fetchStudentPayments = async (studentId: string) => {
         const { data } = await supabase.from('pagos').select('*').eq('student_id', studentId).order('date', { ascending: false });
-        const payments = (data || []) as Payment[];
-        setStudentPayments(payments);
+        const allRecords = (data || []) as Payment[];
+        
+        // BUSCAR CONFIGURACIÓN GUARDADA
+        const planConfig = allRecords.find(r => r.type === 'plan_config');
+        if (planConfig) {
+            setCalcMonthlyFee(planConfig.amount);
+            // CRUCIAL: Recuperar la fecha guardada en la base de datos
+            if(planConfig.date) {
+                setCalcStartDate(new Date(planConfig.date).toISOString().split('T')[0]);
+            }
+        } else {
+            setCalcMonthlyFee(25); // Default si no existe
+            setCalcStartDate('2024-09-01'); // Default original
+        }
 
-        // Calc Debt
-        const startDate = new Date('2024-09-01');
-        const now = new Date();
-        let monthsDiff = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
-        if (monthsDiff < 0) monthsDiff = 0;
-        const totalMonths = monthsDiff + 1; 
-
-        const expectedTotal = 10 + (20 * totalMonths);
-        const totalPaid = payments.reduce((acc, curr) => acc + curr.amount, 0);
-
-        setFinanceStats({ paid: totalPaid, debt: expectedTotal - totalPaid });
+        // FILTRAR PARA MOSTRAR SOLO PAGOS EN LA TABLA
+        setStudentPayments(allRecords.filter(r => r.type !== 'plan_config'));
     }
 
     // --- HANDLERS ESTUDIANTES ---
@@ -493,6 +531,38 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
         if(financeStudent) fetchStudentPayments(financeStudent);
     }
 
+    // --- HANDLER CONFIGURACIÓN PLAN (NUEVO) ---
+    const handleUpdatePlan = async (amount: number) => {
+        if (!financeStudent) return;
+        
+        setCalcMonthlyFee(amount);
+
+        // 1. Eliminar configuración previa (más seguro que update sin ID único conocido)
+        await supabase.from('pagos')
+            .delete()
+            .eq('student_id', financeStudent)
+            .eq('type', 'plan_config');
+
+        // 2. Insertar nueva configuración
+        const { error } = await supabase.from('pagos').insert({
+            student_id: financeStudent,
+            amount: amount,
+            type: 'plan_config',
+            description: 'Configuración Plan Mensual',
+            date: new Date(calcStartDate).toISOString(), // CRUCIAL: GUARDAR LA FECHA SELECCIONADA EN EL CALENDARIO
+            method: 'SISTEMA',
+            verified: true
+        });
+
+        if (!error) {
+            // No es necesario alertar, es una acción de UI fluida
+            // Recalcular localmente
+            // fetchStudentPayments(financeStudent); // No, solo actualizar estado local para evitar parpadeo
+        } else {
+            alert("Error guardando plan: " + error.message);
+        }
+    };
+
     // --- PDF GENERATOR ---
     const handleDownloadReport = async () => {
         if (!selectedStudent) return;
@@ -680,6 +750,14 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             fetchAnnouncements();
             setConfirmDeleteAnnounceId(null);
         }
+    };
+
+    // --- MANEJO DE TOGGLE RECORDATORIOS ---
+    const handleToggleReminders = () => {
+        const newValue = !remindersEnabled;
+        setRemindersEnabled(newValue);
+        localStorage.setItem('LTS_PAYMENT_REMINDERS', String(newValue));
+        alert(`Recordatorios de pago automáticos ${newValue ? 'ACTIVADOS' : 'DESACTIVADOS'} exitosamente.`);
     };
 
     // --- FILTRADO DE ESTUDIANTES ---
@@ -1119,6 +1197,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             {/* TAB CONTENT: ASSIGNMENTS (Reuse existing) */}
             {activeTab === 'assignments' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* ... (existing content for assignments) ... */}
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
                         <h2 className="text-lg font-bold mb-4 flex items-center text-gray-800 dark:text-white"><ClipboardListIcon className="h-5 w-5 mr-2 text-blue-500"/>Nueva Asignación</h2>
                         <div className="space-y-3">
@@ -1170,6 +1249,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             {/* TAB CONTENT: EXAMS (Reuse existing) */}
             {activeTab === 'exams' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* ... (existing content for exams) ... */}
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
                         <h2 className="text-lg font-bold mb-4 flex items-center text-gray-800 dark:text-white"><AcademicCapIcon className="h-5 w-5 mr-2 text-red-500"/>Nuevo Examen</h2>
                         <div className="space-y-3">
@@ -1226,6 +1306,20 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             {/* TAB CONTENT: ANNOUNCEMENTS (RESTAURADO) */}
             {activeTab === 'announcements' && isSuperAdmin && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* PANEL DE CONFIGURACIÓN DE NOTIFICACIONES */}
+                    <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-2 flex items-center justify-between">
+                        <div>
+                            <h3 className="font-bold text-gray-900 dark:text-white">Recordatorios de Pago Automáticos</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Si está activo, los estudiantes verán una alerta roja cuando tengan cuotas vencidas.</p>
+                        </div>
+                        <button 
+                            onClick={handleToggleReminders}
+                            className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${remindersEnabled ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-gray-200 text-gray-600 border border-gray-300'}`}
+                        >
+                            {remindersEnabled ? 'ACTIVADO' : 'DESACTIVADO'}
+                        </button>
+                    </div>
+
                     {/* Formulario */}
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
                         <h2 className="text-lg font-bold mb-4 flex items-center text-gray-800 dark:text-white">
@@ -1315,7 +1409,8 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             {/* TAB CONTENT: FINANCE (NUEVO) */}
             {activeTab === 'finance' && isSuperAdmin && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-                    {/* PANEL IZQUIERDO: SELECCIÓN Y FORMULARIO */}
+                    {/* ... (existing finance content) ... */}
+                    {/* PANEL IZQUIERDO: SELECCIÓN Y CONFIGURACIÓN */}
                     <div className="space-y-6">
                         {/* Selector de Estudiante */}
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
@@ -1340,13 +1435,57 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                             {/* Resumen Rápido si hay seleccionado */}
                             {financeStudent && (
                                 <div className="mt-6 pt-6 border-t dark:border-gray-700">
-                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Pagado</p>
-                                    <p className="text-2xl font-bold text-gray-800 dark:text-white">${financeStats.paid}</p>
+                                    <div className="mb-4 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                                        <p className="text-xs font-bold text-yellow-800 dark:text-yellow-500 uppercase mb-2">Configurar Plan de Pago</p>
+                                        
+                                        {/* Selector de Plan */}
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="text-sm text-gray-600 dark:text-gray-300">Plan Mensual Asignado:</label>
+                                            <div className="flex bg-white dark:bg-gray-800 rounded-md shadow-sm border border-gray-200 dark:border-gray-600 p-1">
+                                                <button 
+                                                    onClick={() => handleUpdatePlan(20)}
+                                                    className={`px-3 py-1 text-xs font-bold rounded transition-all ${calcMonthlyFee === 20 ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                                >
+                                                    $20
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleUpdatePlan(25)}
+                                                    className={`px-3 py-1 text-xs font-bold rounded transition-all ${calcMonthlyFee === 25 ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                                >
+                                                    $25
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Selector de Fecha Inicio */}
+                                        <div className="flex flex-col">
+                                            <label className="text-xs text-gray-500 dark:text-gray-400 mb-1">Inicio de Cobro:</label>
+                                            <input 
+                                                type="date" 
+                                                value={calcStartDate}
+                                                onChange={(e) => setCalcStartDate(e.target.value)}
+                                                className="text-xs p-1 rounded border dark:bg-gray-700 dark:text-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 text-center">
+                                        <div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">Total Esperado</p>
+                                            <p className="text-lg font-bold text-gray-800 dark:text-white">${financeStats.expected}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">Total Pagado</p>
+                                            <p className="text-lg font-bold text-green-600">${financeStats.paid}</p>
+                                        </div>
+                                    </div>
                                     
-                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-4">Deuda Actual</p>
-                                    <p className={`text-2xl font-bold ${financeStats.debt > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                        ${financeStats.debt}
-                                    </p>
+                                    <div className="mt-4 text-center">
+                                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Deuda Actual Calculada</p>
+                                        <p className={`text-3xl font-bold ${financeStats.debt > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                            ${financeStats.debt}
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </div>

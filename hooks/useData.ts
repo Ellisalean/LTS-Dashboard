@@ -1,7 +1,14 @@
 
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../application/supabase.ts';
-import { Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus, User } from '../types.ts';
+import { Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus, User, Payment } from '../types.ts';
+
+interface FinancialStatus {
+    hasDebt: boolean;
+    totalDebt: number;
+    monthsBehind: number;
+}
 
 interface DataState {
     courses: Course[];
@@ -11,7 +18,8 @@ interface DataState {
     messages: Message[];
     calendarEvents: CalendarEvent[];
     loading: boolean;
-    unreadChatCount: number; // Nuevo campo
+    unreadChatCount: number;
+    financialStatus: FinancialStatus; // Nuevo campo
 }
 
 export const useRealtimeData = (user: User | null) => {
@@ -23,7 +31,8 @@ export const useRealtimeData = (user: User | null) => {
         messages: [],
         calendarEvents: [],
         loading: true,
-        unreadChatCount: 0
+        unreadChatCount: 0,
+        financialStatus: { hasDebt: false, totalDebt: 0, monthsBehind: 0 }
     });
 
     useEffect(() => {
@@ -34,7 +43,7 @@ export const useRealtimeData = (user: User | null) => {
         const fetchData = async () => {
             try {
                 // 1. Obtener ID del usuario primero (CRUCIAL para personalizar datos)
-                const { data: dbUser } = await supabase.from('estudiantes').select('id').eq('nombre', user.name).single();
+                const { data: dbUser } = await supabase.from('estudiantes').select('id, matricula').eq('nombre', user.name).single();
                 const userId = dbUser?.id;
 
                 // 2. Obtener TODAS las notas del usuario (Necesarias para calcular el estado de los cursos)
@@ -145,7 +154,44 @@ export const useRealtimeData = (user: User | null) => {
                     unreadChatCount = count || 0;
                 }
 
-                // 9. Calendario
+                // 9. CÁLCULO FINANCIERO (Para Notificaciones Globales)
+                let financialStatus: FinancialStatus = { hasDebt: false, totalDebt: 0, monthsBehind: 0 };
+                if (userId) {
+                    // Obtener pagos
+                    const { data: paymentData } = await supabase.from('pagos').select('*').eq('student_id', userId);
+                    const allPayments = (paymentData || []) as Payment[];
+                    
+                    // CONFIGURACIÓN DINÁMICA
+                    const planConfig = allPayments.find(p => p.type === 'plan_config');
+                    const monthlyFee = planConfig ? planConfig.amount : 25;
+                    // Recuperar fecha de inicio configurada o usar default
+                    let startDate = new Date('2024-09-01');
+                    if(planConfig && planConfig.date) {
+                         startDate = new Date(planConfig.date);
+                    }
+
+                    // Calcular pagado (sin el registro de config)
+                    const totalPaid = allPayments
+                        .filter(p => p.type !== 'plan_config')
+                        .reduce((acc, curr) => acc + curr.amount, 0);
+
+                    // Lógica Dinámica
+                    const now = new Date();
+                    let monthsDiff = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
+                    if (monthsDiff < 0) monthsDiff = 0;
+                    const totalMonths = monthsDiff + 1; // +1 incluye mes corriente
+
+                    const expected = 10 + (monthlyFee * totalMonths); // $10 ins + $20 * meses
+                    const debt = Math.max(0, expected - totalPaid);
+                    
+                    financialStatus = {
+                        hasDebt: debt > 0,
+                        totalDebt: debt,
+                        monthsBehind: Math.floor(debt / monthlyFee) // Estimado
+                    };
+                }
+
+                // 10. Calendario
                 const assignmentEvents: CalendarEvent[] = assignments.map(a => ({
                     id: `assign-${a.id}`,
                     title: `Entrega: ${a.title}`,
@@ -176,7 +222,8 @@ export const useRealtimeData = (user: User | null) => {
                         messages,
                         calendarEvents,
                         loading: false,
-                        unreadChatCount
+                        unreadChatCount,
+                        financialStatus
                     });
                 }
 

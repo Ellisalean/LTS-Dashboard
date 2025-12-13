@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, Assignment, Exam } from '../types.ts';
-import { LogoutIcon, BellIcon, ClockIcon, AcademicCapIcon, ChatIcon, MenuIcon } from './Icons.tsx';
+import { LogoutIcon, BellIcon, ClockIcon, AcademicCapIcon, ChatIcon, MenuIcon, ExclamationTriangleIcon } from './Icons.tsx';
 
 interface HeaderProps {
     user: User;
@@ -9,11 +9,14 @@ interface HeaderProps {
     assignments?: Assignment[];
     exams?: Exam[];
     unreadChatCount?: number;
+    financialStatus?: { hasDebt: boolean; totalDebt: number };
     onMenuClick?: () => void; // New prop for mobile menu
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams = [], unreadChatCount = 0, onMenuClick }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams = [], unreadChatCount = 0, financialStatus, onMenuClick }) => {
     const [showNotifications, setShowNotifications] = useState(false);
+    // Estado para rastrear cuántas notificaciones ya vio el usuario
+    const [lastReadCount, setLastReadCount] = useState(0);
 
     // Lógica para generar notificaciones inteligentes
     const notifications = useMemo(() => {
@@ -23,7 +26,19 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
 
         const alerts: any[] = [];
 
-        // 0. Mensajes de Chat
+        // 0. FINANZAS: Recordatorio de Pago (Si está activado por Admin)
+        const remindersActive = localStorage.getItem('LTS_PAYMENT_REMINDERS') !== 'false'; // Default true
+        
+        if (financialStatus?.hasDebt && remindersActive) {
+            alerts.push({
+                id: 'financial-alert',
+                title: 'Cuota Vencida',
+                msg: `Tienes un saldo pendiente de $${financialStatus.totalDebt}. Por favor regulariza tu situación.`,
+                type: 'danger-money'
+            });
+        }
+
+        // 1. Mensajes de Chat
         if (unreadChatCount > 0) {
             alerts.push({
                 id: 'chat-alert',
@@ -33,7 +48,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
             });
         }
 
-        // 1. Asignaciones próximas
+        // 2. Asignaciones próximas
         const upcomingAssignments = assignments.filter(a => {
             const dueDate = new Date(a.dueDate);
             return !a.isSubmitted && dueDate >= today && dueDate <= threeDaysFromNow;
@@ -48,7 +63,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
             });
         });
 
-        // 2. Exámenes próximos
+        // 3. Exámenes próximos
         const upcomingExams = exams.filter(e => {
             const examDate = new Date(e.date);
             return examDate >= today && examDate <= threeDaysFromNow;
@@ -64,7 +79,19 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
         });
 
         return alerts;
-    }, [assignments, exams, unreadChatCount]);
+    }, [assignments, exams, unreadChatCount, financialStatus]);
+
+    // Manejador del clic en la campana
+    const handleBellClick = () => {
+        if (!showNotifications) {
+            // Si se va a ABRIR el menú, marcamos todas las notificaciones actuales como "leídas" (vistas)
+            setLastReadCount(notifications.length);
+        }
+        setShowNotifications(!showNotifications);
+    };
+
+    // El punto rojo solo se muestra si hay MÁS notificaciones ahora que la última vez que revisamos
+    const showRedDot = notifications.length > lastReadCount;
 
     return (
         <header className="flex items-center justify-between h-20 px-6 bg-white dark:bg-gray-800 border-b dark:border-gray-700 relative z-20">
@@ -84,12 +111,12 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
                 {/* NOTIFICATIONS BELL */}
                 <div className="relative">
                     <button 
-                        onClick={() => setShowNotifications(!showNotifications)}
+                        onClick={handleBellClick}
                         className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors relative"
                     >
                         <BellIcon className="h-6 w-6" />
-                        {notifications.length > 0 && (
-                            <span className="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+                        {showRedDot && (
+                            <span className="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800 animate-pulse"></span>
                         )}
                     </button>
 
@@ -104,11 +131,19 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, assignments = [], exams
                                     notifications.map(n => (
                                         <div key={n.id} className="p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                             <div className="flex items-start">
-                                                <div className={`mt-1 p-1 rounded-full ${n.type === 'danger' ? 'bg-red-100 text-red-600' : n.type === 'info' ? 'bg-blue-100 text-blue-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                                                    {n.type === 'danger' ? <AcademicCapIcon className="h-4 w-4"/> : n.type === 'info' ? <ChatIcon className="h-4 w-4"/> : <ClockIcon className="h-4 w-4"/>}
+                                                <div className={`mt-1 p-1 rounded-full ${
+                                                    n.type === 'danger-money' ? 'bg-red-600 text-white' : 
+                                                    n.type === 'danger' ? 'bg-red-100 text-red-600' : 
+                                                    n.type === 'info' ? 'bg-blue-100 text-blue-600' : 
+                                                    'bg-yellow-100 text-yellow-600'
+                                                }`}>
+                                                    {n.type === 'danger' ? <AcademicCapIcon className="h-4 w-4"/> : 
+                                                     n.type === 'danger-money' ? <ExclamationTriangleIcon className="h-4 w-4"/> :
+                                                     n.type === 'info' ? <ChatIcon className="h-4 w-4"/> : 
+                                                     <ClockIcon className="h-4 w-4"/>}
                                                 </div>
                                                 <div className="ml-3">
-                                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">{n.title}</p>
+                                                    <p className={`text-sm font-semibold ${n.type === 'danger-money' ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-white'}`}>{n.title}</p>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400">{n.msg}</p>
                                                 </div>
                                             </div>

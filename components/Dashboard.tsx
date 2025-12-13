@@ -25,7 +25,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar state
     
     // Obtener datos en tiempo real de Supabase
-    const { courses, assignments, exams, grades, messages, calendarEvents, loading, unreadChatCount } = useRealtimeData(user);
+    const { courses, assignments, exams, grades, messages, calendarEvents, loading, unreadChatCount, financialStatus } = useRealtimeData(user);
 
     if (loading) {
         return (
@@ -81,6 +81,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     assignments={assignments} 
                     exams={exams} 
                     unreadChatCount={unreadChatCount} 
+                    financialStatus={financialStatus}
                     onMenuClick={() => setIsSidebarOpen(true)} // Pass open handler
                 />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">
