@@ -164,7 +164,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
     const [newPayRef, setNewPayRef] = useState('');
     const [newPayDate, setNewPayDate] = useState(new Date().toISOString().split('T')[0]);
 
-    // ... el resto de la lógica permanece igual, solo cambió el valor inicial de calcStartDate ...
+    // ... el resto de la lógica permanece igual ...
     
     useEffect(() => {
         const init = async () => {
@@ -292,7 +292,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
         setStudentPayments(allRecords.filter(r => r.type !== 'plan_config'));
     }
 
-    // ... handlers permanecen igual ...
+    // ... handlers ...
     const handleSelectStudent = (student: StudentData) => {
         setSelectedStudent(student);
         setEditPhotoUrl(student.avatar_url || '');
@@ -476,13 +476,14 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
         if(financeStudent) fetchStudentPayments(financeStudent);
     }
 
-    const handleUpdatePlan = async (amount: number) => {
+    // MODIFICADO: AHORA GUARDA EL VALOR DEL INPUT (state)
+    const handleSavePlanConfig = async () => {
         if (!financeStudent) return;
-        setCalcMonthlyFee(amount);
+        
         await supabase.from('pagos').delete().eq('student_id', financeStudent).eq('type', 'plan_config');
         const { error } = await supabase.from('pagos').insert({
             student_id: financeStudent,
-            amount: amount,
+            amount: calcMonthlyFee, // Usa el valor del estado (input manual)
             type: 'plan_config',
             description: 'Configuración Plan Mensual',
             date: new Date(calcStartDate).toISOString(),
@@ -490,13 +491,14 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             verified: true
         });
         if (!error) {
+            alert("Configuración de plan guardada correctamente.");
         } else {
             alert("Error guardando plan: " + error.message);
         }
     };
 
+    // ... (el resto del código handleDownloadReport, etc. es igual) ...
     const handleDownloadReport = async () => {
-        // ... (misma lógica de reporte PDF) ...
         if (!selectedStudent) return;
         setIsGeneratingPdf(true);
         try {
@@ -504,164 +506,65 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             const doc = new JsPDFClass();
             const autoTableFunc = (autoTable as any).default || autoTable;
             let logoBase64 = null;
-            try {
-                logoBase64 = await getImageData(LOGO_URL);
-            } catch (err) {}
-            if (logoBase64) {
-                doc.addImage(logoBase64, 'PNG', 14, 12, 20, 20);
-            } else {
-                doc.setFillColor(23, 37, 84);
-                doc.rect(14, 12, 20, 20, 'F');
-                doc.setFillColor(255, 255, 255);
-                doc.setFontSize(8);
-                doc.text("LTS", 16, 24);
-            }
-            doc.setFontSize(22);
-            doc.setTextColor(23, 37, 84);
-            doc.text("Latin Theological Seminary", 40, 23);
-            doc.setFontSize(14);
-            doc.setTextColor(100);
-            doc.text("Boletín Oficial de Calificaciones", 40, 30);
-            doc.setDrawColor(23, 37, 84);
-            doc.setLineWidth(0.5);
-            doc.line(14, 38, 196, 38);
-            doc.setFontSize(11);
-            doc.setTextColor(50);
-            doc.text(`Nombre del Alumno:`, 14, 50);
-            doc.setFont("helvetica", "bold");
-            doc.text(selectedStudent.nombre, 55, 50);
-            doc.setFont("helvetica", "normal");
-            doc.text(`Correo Electrónico:`, 14, 58);
-            doc.text(selectedStudent.email || 'No registrado', 55, 58);
-            doc.text(`Fecha de Emisión:`, 14, 66);
-            doc.text(new Date().toLocaleDateString(), 55, 66);
-            doc.setFont("helvetica", "bold");
-            doc.text(`Programa:`, 14, 74);
-            doc.setFont("helvetica", "normal");
-            doc.text(DEGREE_PROGRAM_NAME, 55, 74);
-            const tableData = studentGrades.map(g => [
-                coursesList.find(c => c.id === g.curso_id)?.nombre || g.curso_id,
-                g.titulo_asignacion,
-                `${g.puntuacion} / ${g.puntuacion_maxima}`
-            ]);
-            autoTableFunc(doc, {
-                startY: 82,
-                head: [['Materia / Curso', 'Evaluación', 'Calificación']],
-                body: tableData,
-                theme: 'striped',
-                headStyles: { fillColor: [23, 37, 84], textColor: [255, 255, 255] },
-                styles: { fontSize: 10, cellPadding: 3 },
-                alternateRowStyles: { fillColor: [240, 245, 255] }
-            });
+            try { logoBase64 = await getImageData(LOGO_URL); } catch (err) {}
+            if (logoBase64) { doc.addImage(logoBase64, 'PNG', 14, 12, 20, 20); } else { doc.setFillColor(23, 37, 84); doc.rect(14, 12, 20, 20, 'F'); doc.setFillColor(255, 255, 255); doc.setFontSize(8); doc.text("LTS", 16, 24); }
+            doc.setFontSize(22); doc.setTextColor(23, 37, 84); doc.text("Latin Theological Seminary", 40, 23);
+            doc.setFontSize(14); doc.setTextColor(100); doc.text("Boletín Oficial de Calificaciones", 40, 30);
+            doc.setDrawColor(23, 37, 84); doc.setLineWidth(0.5); doc.line(14, 38, 196, 38);
+            doc.setFontSize(11); doc.setTextColor(50); doc.text(`Nombre del Alumno:`, 14, 50); doc.setFont("helvetica", "bold"); doc.text(selectedStudent.nombre, 55, 50);
+            doc.setFont("helvetica", "normal"); doc.text(`Correo Electrónico:`, 14, 58); doc.text(selectedStudent.email || 'No registrado', 55, 58);
+            doc.text(`Fecha de Emisión:`, 14, 66); doc.text(new Date().toLocaleDateString(), 55, 66);
+            doc.setFont("helvetica", "bold"); doc.text(`Programa:`, 14, 74); doc.setFont("helvetica", "normal"); doc.text(DEGREE_PROGRAM_NAME, 55, 74);
+            const tableData = studentGrades.map(g => [coursesList.find(c => c.id === g.curso_id)?.nombre || g.curso_id, g.titulo_asignacion, `${g.puntuacion} / ${g.puntuacion_maxima}`]);
+            autoTableFunc(doc, { startY: 82, head: [['Materia / Curso', 'Evaluación', 'Calificación']], body: tableData, theme: 'striped', headStyles: { fillColor: [23, 37, 84], textColor: [255, 255, 255] }, styles: { fontSize: 10, cellPadding: 3 }, alternateRowStyles: { fillColor: [240, 245, 255] } });
             const pageCount = (doc as any).internal.getNumberOfPages();
-            for(let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                doc.setFontSize(10);
-                doc.setTextColor(150);
-                doc.text(`Página ${i} de ${pageCount}`, 196, 285, { align: 'right' });
-                doc.text("Este documento es un reporte oficial del sistema LTS.", 14, 285);
-            }
+            for(let i = 1; i <= pageCount; i++) { doc.setPage(i); doc.setFontSize(10); doc.setTextColor(150); doc.text(`Página ${i} de ${pageCount}`, 196, 285, { align: 'right' }); doc.text("Este documento es un reporte oficial del sistema LTS.", 14, 285); }
             doc.save(`Boletin_${selectedStudent.nombre.replace(/\s+/g, '_')}.pdf`);
-        } catch (error) {
-            alert("Error al generar el PDF: " + (error as any).message);
-        } finally {
-            setIsGeneratingPdf(false);
-        }
+        } catch (error) { alert("Error al generar el PDF: " + (error as any).message); } finally { setIsGeneratingPdf(false); }
     };
 
     const handleLoadAttendance = async () => {
-        // ... (misma lógica) ...
         if (!attendanceCourse || !attendanceDate) return;
         const { data } = await supabase.from('asistencias').select('estudiante_id, estado').eq('curso_id', attendanceCourse).eq('fecha', attendanceDate);
         const currentStatus: Record<string, string> = {};
         students.forEach(s => currentStatus[s.id] = 'ausente'); 
-        if (data) {
-            data.forEach((r: any) => {
-                currentStatus[r.estudiante_id] = r.estado;
-            });
-        }
+        if (data) { data.forEach((r: any) => { currentStatus[r.estudiante_id] = r.estado; }); }
         setAttendanceList(currentStatus);
     };
 
     const handleMarkAttendance = async (studentId: string, status: string) => {
-        // ... (misma lógica) ...
         setAttendanceList(prev => ({ ...prev, [studentId]: status }));
         const { data: existing } = await supabase.from('asistencias').select('id').eq('estudiante_id', studentId).eq('curso_id', attendanceCourse).eq('fecha', attendanceDate).single();
-        if (existing) {
-            await supabase.from('asistencias').update({ estado: status }).eq('id', existing.id);
-        } else {
-            await supabase.from('asistencias').insert({ estudiante_id: studentId, curso_id: attendanceCourse, fecha: attendanceDate, estado: status });
-        }
+        if (existing) { await supabase.from('asistencias').update({ estado: status }).eq('id', existing.id); } else { await supabase.from('asistencias').insert({ estudiante_id: studentId, curso_id: attendanceCourse, fecha: attendanceDate, estado: status }); }
     };
 
-    const handleAddAssignment = async () => {
-        if (!newAssignCourse || !newAssignTitle) return;
-        const { error } = await supabase.from('asignaciones').insert({ curso_id: newAssignCourse, titulo: newAssignTitle, fecha_entrega: newAssignDate || null });
-        if (!error) { setNewAssignTitle(''); setNewAssignDate(''); fetchAssignments(); }
-    };
-    const handleDeleteAssignment = async (id: string) => {
-        const { error } = await supabase.from('asignaciones').delete().eq('id', id);
-        if (!error) { fetchAssignments(); setConfirmDeleteAssignId(null); }
-    };
-    const handleAddExam = async () => {
-        if (!newExamCourse || !newExamTitle) return;
-        const { error } = await supabase.from('examenes').insert({ curso_id: newExamCourse, titulo: newExamTitle, fecha: newExamDate || null, hora: newExamTime });
-        if (!error) { setNewExamTitle(''); setNewExamDate(''); fetchExams(); }
-    };
-    const handleDeleteExam = async (id: string) => {
-        const { error } = await supabase.from('examenes').delete().eq('id', id);
-        if (!error) { fetchExams(); setConfirmDeleteExamId(null); }
-    };
-    const handleAddAnnouncement = async () => {
-        if (!isSuperAdmin) return;
-        if (!newAnnounceContent) return;
-        const { error } = await supabase.from('mensajes').insert({ remitente: newAnnounceSender || 'Dirección', asunto: newAnnounceContent, leido: false, fecha_envio: new Date().toISOString() });
-        if (!error) { setNewAnnounceContent(''); fetchAnnouncements(); }
-    };
-    const handleDeleteAnnouncement = async (id: string) => {
-        if (!isSuperAdmin) return;
-        const { error } = await supabase.from('mensajes').delete().eq('id', id);
-        if (!error) { fetchAnnouncements(); setConfirmDeleteAnnounceId(null); }
-    };
-    const handleToggleReminders = () => {
-        const newValue = !remindersEnabled;
-        setRemindersEnabled(newValue);
-        localStorage.setItem('LTS_PAYMENT_REMINDERS', String(newValue));
-        alert(`Recordatorios de pago automáticos ${newValue ? 'ACTIVADOS' : 'DESACTIVADOS'} exitosamente.`);
-    };
+    const handleAddAssignment = async () => { if (!newAssignCourse || !newAssignTitle) return; const { error } = await supabase.from('asignaciones').insert({ curso_id: newAssignCourse, titulo: newAssignTitle, fecha_entrega: newAssignDate || null }); if (!error) { setNewAssignTitle(''); setNewAssignDate(''); fetchAssignments(); } };
+    const handleDeleteAssignment = async (id: string) => { const { error } = await supabase.from('asignaciones').delete().eq('id', id); if (!error) { fetchAssignments(); setConfirmDeleteAssignId(null); } };
+    const handleAddExam = async () => { if (!newExamCourse || !newExamTitle) return; const { error } = await supabase.from('examenes').insert({ curso_id: newExamCourse, titulo: newExamTitle, fecha: newExamDate || null, hora: newExamTime }); if (!error) { setNewExamTitle(''); setNewExamDate(''); fetchExams(); } };
+    const handleDeleteExam = async (id: string) => { const { error } = await supabase.from('examenes').delete().eq('id', id); if (!error) { fetchExams(); setConfirmDeleteExamId(null); } };
+    const handleAddAnnouncement = async () => { if (!isSuperAdmin) return; if (!newAnnounceContent) return; const { error } = await supabase.from('mensajes').insert({ remitente: newAnnounceSender || 'Dirección', asunto: newAnnounceContent, leido: false, fecha_envio: new Date().toISOString() }); if (!error) { setNewAnnounceContent(''); fetchAnnouncements(); } };
+    const handleDeleteAnnouncement = async (id: string) => { if (!isSuperAdmin) return; const { error } = await supabase.from('mensajes').delete().eq('id', id); if (!error) { fetchAnnouncements(); setConfirmDeleteAnnounceId(null); } };
+    const handleToggleReminders = () => { const newValue = !remindersEnabled; setRemindersEnabled(newValue); localStorage.setItem('LTS_PAYMENT_REMINDERS', String(newValue)); alert(`Recordatorios de pago automáticos ${newValue ? 'ACTIVADOS' : 'DESACTIVADOS'} exitosamente.`); };
 
-    const filteredStudents = students.filter(student => 
-        student.nombre.toLowerCase().includes(studentSearchTerm.toLowerCase()) ||
-        (student.email && student.email.toLowerCase().includes(studentSearchTerm.toLowerCase()))
-    );
+    const filteredStudents = students.filter(student => student.nombre.toLowerCase().includes(studentSearchTerm.toLowerCase()) || (student.email && student.email.toLowerCase().includes(studentSearchTerm.toLowerCase())));
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando panel de administración...</div>;
 
-    // ... (el renderizado permanece igual) ...
-    // Se devuelve el contenido completo del renderizado para asegurar consistencia
+    // ... VISTAS ...
     if (selectedStudent && activeTab === 'students') {
         return (
             <div className="space-y-6 animate-fade-in">
+                {/* ... (código existente del detalle de estudiante) ... */}
                 <div className="flex justify-between items-center mb-4">
                     <button onClick={() => setSelectedStudent(null)} className="text-blue-600 hover:underline flex items-center">← Volver a la lista</button>
                     <div className="flex space-x-2">
                         {isSuperAdmin && (
-                            <button 
-                                onClick={() => handleSendCredentials(selectedStudent)}
-                                disabled={sendingEmailId === selectedStudent.id}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 shadow disabled:opacity-50"
-                            >
-                                <MailIcon className="h-5 w-5 mr-2"/>
-                                {sendingEmailId === selectedStudent.id ? 'Enviando...' : 'Enviar Credenciales'}
+                            <button onClick={() => handleSendCredentials(selectedStudent)} disabled={sendingEmailId === selectedStudent.id} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 shadow disabled:opacity-50">
+                                <MailIcon className="h-5 w-5 mr-2"/> {sendingEmailId === selectedStudent.id ? 'Enviando...' : 'Enviar Credenciales'}
                             </button>
                         )}
-                        <button 
-                            onClick={handleDownloadReport} 
-                            disabled={isGeneratingPdf}
-                            className="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center hover:bg-gray-900 shadow disabled:opacity-50"
-                        >
-                            <DownloadIcon className="h-5 w-5 mr-2"/>
-                            {isGeneratingPdf ? 'Generando...' : 'Descargar Boletín PDF'}
+                        <button onClick={handleDownloadReport} disabled={isGeneratingPdf} className="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center hover:bg-gray-900 shadow disabled:opacity-50">
+                            <DownloadIcon className="h-5 w-5 mr-2"/> {isGeneratingPdf ? 'Generando...' : 'Descargar Boletín PDF'}
                         </button>
                     </div>
                 </div>
@@ -671,9 +574,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                         <div className="flex flex-col items-center space-y-4 mb-6">
                             <img src={editPhotoUrl || selectedStudent.avatar_url} className="w-32 h-32 rounded-full object-cover border-4 border-blue-500" />
                             <div className="text-center px-4">
-                                <span className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wide">
-                                    {selectedStudent.rol || 'Estudiante'}
-                                </span>
+                                <span className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wide">{selectedStudent.rol || 'Estudiante'}</span>
                                 <p className="text-gray-600 dark:text-gray-300 font-medium">{DEGREE_PROGRAM_NAME}</p>
                             </div>
                         </div>
@@ -693,8 +594,7 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Gestión de Notas</h2>
                         <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg mb-4 border border-gray-200 dark:border-gray-600 space-y-2">
                             <select value={newGradeCourse} onChange={(e) => setNewGradeCourse(e.target.value)} className="w-full p-2 rounded border dark:bg-gray-800 dark:text-white">
-                                <option value="">Seleccionar Curso...</option>
-                                {coursesList.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                                <option value="">Seleccionar Curso...</option> {coursesList.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                             </select>
                             <input type="text" placeholder="Título (Ej: Examen Final)" value={newGradeTitle} onChange={(e) => setNewGradeTitle(e.target.value)} className="w-full p-2 rounded border dark:bg-gray-800 dark:text-white" />
                             <div className="flex space-x-2">
@@ -729,32 +629,26 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
         );
     }
 
+    // ... (El resto del return principal sigue igual hasta TAB FINANCE) ...
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between mb-2">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
-                    <UserGroupIcon className="h-8 w-8 mr-3 text-amber-500"/>
-                    {isSuperAdmin ? 'Panel de Dirección' : `Panel Docente: ${user.name}`}
-                </h1>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center"><UserGroupIcon className="h-8 w-8 mr-3 text-amber-500"/>{isSuperAdmin ? 'Panel de Dirección' : `Panel Docente: ${user.name}`}</h1>
             </div>
+            {/* TABS */}
             <div className="flex space-x-1 bg-gray-200 dark:bg-gray-700 p-1 rounded-lg w-full md:w-fit overflow-x-auto">
                 <button onClick={() => setActiveTab('students')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'students' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Estudiantes</button>
                 <button onClick={() => setActiveTab('courses')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'courses' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Cursos</button>
                 <button onClick={() => setActiveTab('assignments')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'assignments' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asignaciones</button>
                 <button onClick={() => setActiveTab('exams')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'exams' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Exámenes</button>
                 <button onClick={() => setActiveTab('attendance')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'attendance' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Asistencia</button>
-                {isSuperAdmin && (
-                    <button onClick={() => setActiveTab('finance')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'finance' ? 'bg-white text-green-600 shadow-sm dark:bg-gray-800 dark:text-green-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Finanzas</button>
-                )}
-                {isSuperAdmin && (
-                    <button onClick={() => setActiveTab('announcements')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Anuncios</button>
-                )}
+                {isSuperAdmin && ( <button onClick={() => setActiveTab('finance')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'finance' ? 'bg-white text-green-600 shadow-sm dark:bg-gray-800 dark:text-green-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Finanzas</button> )}
+                {isSuperAdmin && ( <button onClick={() => setActiveTab('announcements')} className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'}`}>Anuncios</button> )}
             </div>
 
-            {/* TAB: COURSES */}
+            {/* TAB COURSES, STUDENTS, ETC (Same content) */}
             {activeTab === 'courses' && (
                 <div className="grid grid-cols-1 gap-6">
-                    {/* ... (mismo contenido de cursos) ... */}
                     {editingCourse ? (
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md animate-fade-in">
                             <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white flex items-center">
@@ -807,9 +701,8 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                 </div>
             )}
 
-            {/* TAB: STUDENTS */}
+            {/* TAB: STUDENTS (Hidden for brevity, same as original) */}
             {activeTab === 'students' && (
-                // ... (mismo contenido de estudiantes) ...
                 <div className="space-y-4">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div className="relative w-full md:w-96">
@@ -897,9 +790,8 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                 </div>
             )}
 
-            {/* TAB: ATTENDANCE, EXAMS, ASSIGNMENTS, ANNOUNCEMENTS ... (Same as above) */}
+            {/* TAB: ATTENDANCE */}
             {activeTab === 'attendance' && (
-                // ... (mismo contenido de asistencia) ...
                 <div className="space-y-6">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex flex-wrap gap-4 items-end">
                         <div className="flex-1 min-w-[200px]">
@@ -950,7 +842,6 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             )}
 
             {activeTab === 'assignments' && (
-                // ... (mismo contenido asignaciones) ...
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
                         <h2 className="text-lg font-bold mb-4 flex items-center text-gray-800 dark:text-white"><ClipboardListIcon className="h-5 w-5 mr-2 text-blue-500"/>Nueva Asignación</h2>
@@ -995,7 +886,6 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             )}
 
             {activeTab === 'exams' && (
-                // ... (mismo contenido examenes) ...
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-fit">
                         <h2 className="text-lg font-bold mb-4 flex items-center text-gray-800 dark:text-white"><AcademicCapIcon className="h-5 w-5 mr-2 text-red-500"/>Nuevo Examen</h2>
@@ -1040,7 +930,6 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
             )}
 
             {activeTab === 'announcements' && isSuperAdmin && (
-                // ... (mismo contenido anuncios) ...
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-2 flex items-center justify-between">
                         <div>
@@ -1103,17 +992,33 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ user }) => {
                                 <div className="mt-6 pt-6 border-t dark:border-gray-700">
                                     <div className="mb-4 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800">
                                         <p className="text-xs font-bold text-yellow-800 dark:text-yellow-500 uppercase mb-2">Configurar Plan de Pago</p>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className="text-sm text-gray-600 dark:text-gray-300">Plan Mensual Asignado:</label>
-                                            <div className="flex bg-white dark:bg-gray-800 rounded-md shadow-sm border border-gray-200 dark:border-gray-600 p-1">
-                                                <button onClick={() => handleUpdatePlan(20)} className={`px-3 py-1 text-xs font-bold rounded transition-all ${calcMonthlyFee === 20 ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>$20</button>
-                                                <button onClick={() => handleUpdatePlan(25)} className={`px-3 py-1 text-xs font-bold rounded transition-all ${calcMonthlyFee === 25 ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>$25</button>
+                                        
+                                        {/* MONTO PERSONALIZABLE */}
+                                        <div className="mb-3">
+                                            <label className="text-sm text-gray-600 dark:text-gray-300 mb-1 block">Monto Mensual ($):</label>
+                                            <div className="flex gap-2">
+                                                <input 
+                                                    type="number" 
+                                                    value={calcMonthlyFee}
+                                                    onChange={(e) => setCalcMonthlyFee(Number(e.target.value))}
+                                                    className="w-20 p-1 rounded border dark:bg-gray-700 dark:text-white text-center font-bold"
+                                                />
+                                                <button onClick={() => setCalcMonthlyFee(20)} className="text-xs bg-gray-200 dark:bg-gray-700 px-2 rounded hover:bg-gray-300 transition-colors">$20</button>
+                                                <button onClick={() => setCalcMonthlyFee(25)} className="text-xs bg-gray-200 dark:bg-gray-700 px-2 rounded hover:bg-gray-300 transition-colors">$25</button>
                                             </div>
                                         </div>
-                                        <div className="flex flex-col">
+
+                                        <div className="flex flex-col mb-4">
                                             <label className="text-xs text-gray-500 dark:text-gray-400 mb-1">Inicio de Cobro:</label>
                                             <input type="date" value={calcStartDate} onChange={(e) => setCalcStartDate(e.target.value)} className="text-xs p-1 rounded border dark:bg-gray-700 dark:text-white" />
                                         </div>
+
+                                        <button 
+                                            onClick={handleSavePlanConfig} 
+                                            className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-2 rounded transition-colors"
+                                        >
+                                            Guardar Configuración del Plan
+                                        </button>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 text-center">
                                         <div><p className="text-xs text-gray-500 dark:text-gray-400">Total Esperado</p><p className="text-lg font-bold text-gray-800 dark:text-white">${financeStats.expected}</p></div>
