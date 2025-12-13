@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { User, Payment } from '../../types.ts';
 import { supabase } from '../../application/supabase.ts';
@@ -41,8 +40,8 @@ const FinancialView: React.FC<FinancialViewProps> = ({ user }) => {
             const planConfigRecord = allRecords.find(p => p.type === 'plan_config');
             const currentFee = planConfigRecord ? planConfigRecord.amount : 25; // Default $25 si no ha sido configurado por admin
             
-            // CRUCIAL: Utilizar fecha de inicio configurada o fallback a septiembre
-            let startDate = new Date('2024-09-01');
+            // CRUCIAL: Utilizar fecha de inicio configurada o fallback a OCTUBRE
+            let startDate = new Date('2024-10-01'); // CAMBIO: Inicio oficial Octubre
             if(planConfigRecord && planConfigRecord.date) {
                 startDate = new Date(planConfigRecord.date);
             }
@@ -155,7 +154,7 @@ const FinancialView: React.FC<FinancialViewProps> = ({ user }) => {
                                  <ExclamationTriangleIcon className="h-4 w-4 mr-1"/>
                                  {stats.monthsPending} {stats.monthsPending === 1 ? 'Cuota pendiente' : 'Cuotas pendientes'}
                              </p>
-                             <p className="text-[10px] text-red-500 mt-1 opacity-80">Calculado sobre plan de ${monthlyFee}</p>
+                             <p className="text-[10px] text-red-500 mt-1 opacity-80">Calculado sobre plan de ${monthlyFee} (Desde Octubre)</p>
                          </div>
                     )}
                 </div>

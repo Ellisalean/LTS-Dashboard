@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect } from 'react';
 import { supabase } from '../application/supabase.ts';
 import { Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus, User, Payment } from '../types.ts';
@@ -164,8 +163,8 @@ export const useRealtimeData = (user: User | null) => {
                     // CONFIGURACIÓN DINÁMICA
                     const planConfig = allPayments.find(p => p.type === 'plan_config');
                     const monthlyFee = planConfig ? planConfig.amount : 25;
-                    // Recuperar fecha de inicio configurada o usar default
-                    let startDate = new Date('2024-09-01');
+                    // Recuperar fecha de inicio configurada o usar default (OCTUBRE)
+                    let startDate = new Date('2024-10-01'); // CAMBIO: Default Octubre
                     if(planConfig && planConfig.date) {
                          startDate = new Date(planConfig.date);
                     }
