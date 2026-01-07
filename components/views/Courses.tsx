@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Course, CourseStatus, User, Assignment, Exam, Grade } from '../../types.ts';
-import { BookOpenIcon } from '../Icons.tsx';
+import { BookOpenIcon, SearchIcon } from '../Icons.tsx';
 import CourseDetail from './CourseDetail.tsx';
 
 const getStatusClass = (status: CourseStatus) => {
@@ -18,32 +18,31 @@ const getStatusClass = (status: CourseStatus) => {
 };
 
 const CourseCard: React.FC<{ course: Course; onClick: () => void; }> = ({ course, onClick }) => (
-    <div onClick={onClick} className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer">
-        <div className="h-40 bg-gray-100 dark:bg-gray-700 relative">
+    <div onClick={onClick} className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg overflow-hidden transform hover:-translate-y-2 transition-all duration-300 cursor-pointer border-b-8 border-blue-500/20 group">
+        <div className="h-40 bg-gray-100 dark:bg-gray-700 relative overflow-hidden">
             {course.imageUrl ? (
-                <img src={course.imageUrl} className="w-full h-full object-cover" alt={course.title} />
+                <img src={course.imageUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={course.title} />
             ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800">
-                    <BookOpenIcon className="h-16 w-16 text-gray-400 dark:text-gray-500 opacity-30" />
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-700">
+                    <BookOpenIcon className="h-12 w-12 text-white opacity-20" />
                 </div>
             )}
-            <div className="absolute bottom-4 left-4">
-                 <span className={`px-2 py-1 text-xs font-bold rounded-full shadow-lg ${getStatusClass(course.status)}`}>
+            <div className="absolute top-4 right-4">
+                 <span className={`px-3 py-1 text-[10px] font-black rounded-full shadow-lg uppercase tracking-widest ${getStatusClass(course.status)}`}>
                     {course.status}
                 </span>
             </div>
+            <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent"></div>
+            <div className="absolute bottom-4 left-4">
+                <span className="text-white text-[9px] font-bold uppercase tracking-widest opacity-80">Cód: {course.id}</span>
+            </div>
         </div>
         <div className="p-6">
-            <div className="flex justify-between items-start">
-                <div>
-                    <div className="uppercase tracking-wide text-[10px] text-blue-500 dark:text-blue-400 font-bold mb-1">{course.id}</div>
-                    <h3 className="block text-lg leading-tight font-bold text-black dark:text-white line-clamp-2 h-14">{course.title}</h3>
-                </div>
-            </div>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-2 h-10 overflow-hidden text-ellipsis leading-relaxed">{course.description}</p>
-            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center text-xs text-gray-600 dark:text-gray-300">
-                <span>Prof: <strong>{course.professor}</strong></span>
-                <span className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded"><strong>{course.credits}</strong> Creds</span>
+            <h3 className="text-lg leading-tight font-black text-gray-900 dark:text-white line-clamp-2 h-14 group-hover:text-blue-600 transition-colors">{course.title}</h3>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 h-8 overflow-hidden">{course.description || "Sin descripción disponible."}</p>
+            <div className="mt-4 pt-4 border-t border-gray-50 dark:border-gray-700 flex justify-between items-center text-[10px] text-gray-600 dark:text-gray-400 uppercase font-bold tracking-tighter">
+                <span className="truncate w-32 flex items-center"><div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div> {course.professor}</span>
+                <span className="bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-2 py-1 rounded-lg">{course.credits} Créditos</span>
             </div>
         </div>
     </div>
@@ -61,14 +60,12 @@ interface CoursesProps {
 
 const Courses: React.FC<CoursesProps> = ({ user, courses, assignments, exams, grades, targetCourseId, onClearTarget }) => {
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
-    // Efecto para abrir un curso si venimos redireccionados del Home
     useEffect(() => {
         if (targetCourseId) {
             const course = courses.find(c => c.id === targetCourseId);
-            if (course) {
-                setSelectedCourse(course);
-            }
+            if (course) setSelectedCourse(course);
         }
     }, [targetCourseId, courses]);
 
@@ -76,6 +73,11 @@ const Courses: React.FC<CoursesProps> = ({ user, courses, assignments, exams, gr
         setSelectedCourse(null);
         if (onClearTarget) onClearTarget();
     };
+
+    const filteredCourses = courses.filter(c => 
+        c.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        c.id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     if (selectedCourse) {
         return <CourseDetail 
@@ -89,15 +91,40 @@ const Courses: React.FC<CoursesProps> = ({ user, courses, assignments, exams, gr
     }
 
     return (
-        <div className="animate-fade-in">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
-                <BookOpenIcon className="h-8 w-8 mr-3 text-blue-500"/>
-                Mis Cursos
-            </h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {courses.map(course => (
+        <div className="animate-fade-in space-y-8 pb-12">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-4xl font-black text-gray-900 dark:text-white flex items-center tracking-tighter">
+                        <BookOpenIcon className="h-10 w-10 mr-4 text-blue-500"/>
+                        Plan de Estudios
+                    </h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1 ml-14 text-sm font-medium">Explora las materias de tu programa académico.</p>
+                </div>
+                
+                <div className="relative w-full md:w-96 group">
+                    <SearchIcon className="absolute left-4 top-3.5 h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input 
+                        type="text"
+                        placeholder="Buscar materia por nombre o código..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-gray-800 border-2 border-transparent shadow-xl rounded-2xl text-sm font-medium focus:ring-0 focus:border-blue-500 outline-none transition-all dark:text-white"
+                    />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                {filteredCourses.map(course => (
                     <CourseCard key={course.id} course={course} onClick={() => setSelectedCourse(course)} />
                 ))}
+                {filteredCourses.length === 0 && (
+                    <div className="col-span-full py-24 text-center">
+                        <div className="bg-gray-50 dark:bg-gray-800/50 inline-block p-8 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                             <SearchIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                             <p className="text-gray-500 dark:text-gray-400 font-bold">No se encontraron materias que coincidan con tu búsqueda.</p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
