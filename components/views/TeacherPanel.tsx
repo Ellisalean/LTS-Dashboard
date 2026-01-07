@@ -74,16 +74,18 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [editPassword, setEditPassword] = useState('');
     const [studentGrades, setStudentGrades] = useState<GradeData[]>([]);
     const [studentInscriptions, setStudentInscriptions] = useState<string[]>([]);
-
-    const [assignments, setAssignments] = useState<any[]>([]);
-    const [exams, setExams] = useState<any[]>([]);
-    const [announcements, setAnnouncements] = useState<any[]>([]);
     const [studentPayments, setStudentPayments] = useState<Payment[]>([]);
-    
+
+    // Estados para nuevos registros
     const [newGradeCourse, setNewGradeCourse] = useState('');
     const [newGradeTitle, setNewGradeTitle] = useState('Nota Final');
     const [newGradeScore, setNewGradeScore] = useState(0);
 
+    const [newPayAmount, setNewPayAmount] = useState(0);
+    const [newPayDesc, setNewPayDesc] = useState('');
+    const [newPayMethod, setNewPayMethod] = useState('Zelle');
+
+    // Missing state hooks for new assignments, exams, and announcements
     const [newAssignCourse, setNewAssignCourse] = useState('');
     const [newAssignTitle, setNewAssignTitle] = useState('');
     const [newAssignDate, setNewAssignDate] = useState('');
@@ -94,6 +96,10 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
 
     const [newAnnounceMsg, setNewAnnounceMsg] = useState('');
 
+    const [assignments, setAssignments] = useState<any[]>([]);
+    const [exams, setExams] = useState<any[]>([]);
+    const [announcements, setAnnouncements] = useState<any[]>([]);
+    
     const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
     const [attendanceCourse, setAttendanceCourse] = useState('');
     const [attendanceMap, setAttendanceMap] = useState<Record<string, string>>({});
@@ -125,12 +131,44 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         setEditName(student.nombre);
         setEditEmail(student.email || '');
         setEditPassword(student.password || '');
+        
+        // Cargar notas e inscripciones
         const { data: grades } = await supabase.from('notas').select('*').eq('estudiante_id', student.id);
         setStudentGrades(grades || []);
         const { data: insc } = await supabase.from('inscripciones').select('curso_id').eq('estudiante_id', student.id);
         setStudentInscriptions((insc || []).map(i => i.curso_id));
-        const { data: pays } = await supabase.from('pagos').select('*').eq('student_id', student.id).order('date', { ascending: false });
-        setStudentPayments(pays || []);
+        
+        // Cargar pagos del alumno
+        fetchStudentPayments(student.id);
+    };
+
+    const fetchStudentPayments = async (studentId: string) => {
+        const { data } = await supabase.from('pagos').select('*').eq('student_id', studentId).order('date', { ascending: false });
+        setStudentPayments(data || []);
+    };
+
+    const handleAddPayment = async () => {
+        if (!selectedStudent || newPayAmount <= 0) return;
+        const { error } = await supabase.from('pagos').insert({
+            student_id: selectedStudent.id,
+            amount: newPayAmount,
+            description: newPayDesc || 'Mensualidad',
+            method: newPayMethod,
+            date: new Date().toISOString().split('T')[0],
+            verified: true,
+            type: 'tuition'
+        });
+        if (!error) {
+            fetchStudentPayments(selectedStudent.id);
+            setNewPayAmount(0);
+            setNewPayDesc('');
+        }
+    };
+
+    const handleDeletePayment = async (id: string) => {
+        if (!confirm('¿Eliminar este registro de pago?')) return;
+        await supabase.from('pagos').delete().eq('id', id);
+        if (selectedStudent) fetchStudentPayments(selectedStudent.id);
     };
 
     const toggleInscription = async (courseId: string) => {
@@ -282,7 +320,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     </div>;
 
     return (
-        <div className="space-y-6 pb-20 max-w-7xl mx-auto px-4">
+        <div className="space-y-6 pb-20 max-w-[1600px] mx-auto px-4">
             <h1 className="text-3xl font-black flex items-center text-gray-800 dark:text-white tracking-tighter">
                 <UserGroupIcon className="h-9 w-9 mr-4 text-blue-600"/>
                 Gestión Administrativa
@@ -308,7 +346,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 ))}
             </div>
 
-            {/* VISTA ALUMNOS */}
+            {/* VISTA ALUMNOS (LISTA) */}
             {activeTab === 'students' && !selectedStudent && (
                 <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-700 animate-fade-in">
                     <div className="p-6 border-b dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20">
@@ -345,7 +383,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
-            {/* GESTIÓN DE ALUMNO ESPECÍFICO */}
+            {/* GESTIÓN DE ALUMNO ESPECÍFICO (4 COLUMNAS AHORA) */}
             {activeTab === 'students' && selectedStudent && (
                 <div className="space-y-6 animate-fade-in">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -362,7 +400,8 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                        {/* 1. Perfil */}
                         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border-t-8 border-blue-500">
                             <h3 className="font-black uppercase text-[10px] text-gray-400 tracking-widest mb-6">Información Básica</h3>
                             <div className="flex flex-col items-center mb-8">
@@ -376,9 +415,10 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                         </div>
 
+                        {/* 2. Inscripciones */}
                         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border-t-8 border-green-500 h-[600px] flex flex-col">
                             <h3 className="font-black uppercase text-[10px] text-gray-400 tracking-widest mb-2">Trimestre Actual</h3>
-                            <p className="text-[10px] text-gray-400 italic mb-6">Activa las materias para el cursado vigente.</p>
+                            <p className="text-[10px] text-gray-400 italic mb-6">Activa materias para cursado.</p>
                             <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
                                 {adminCourses.map(c => {
                                     const isInscribed = studentInscriptions.includes(c.id);
@@ -389,10 +429,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                             className={`p-5 rounded-3xl border-2 cursor-pointer transition-all flex items-center justify-between group ${isInscribed ? 'bg-blue-50 border-blue-400 dark:bg-blue-900/30' : 'bg-gray-50 border-transparent dark:bg-gray-700/50 hover:bg-gray-100'}`}
                                         >
                                             <div className="flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-xs font-black text-gray-800 dark:text-white truncate max-w-[140px] tracking-tighter">{c.nombre}</p>
-                                                    {isAproved && <CheckCircleIcon className="w-4 h-4 text-green-500" title="Aprobada"/>}
-                                                </div>
+                                                <p className="text-xs font-black text-gray-800 dark:text-white truncate max-w-[120px]">{c.nombre}</p>
                                                 <p className="text-[10px] text-gray-400 font-bold">Prof: {c.profesor}</p>
                                             </div>
                                             <div className={`h-10 w-10 rounded-2xl flex items-center justify-center transition-all ${isInscribed ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 text-gray-400 group-hover:scale-110'}`}>
@@ -404,6 +441,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                         </div>
 
+                        {/* 3. Notas */}
                         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border-t-8 border-amber-500 h-[600px] flex flex-col">
                             <h3 className="font-black uppercase text-[10px] text-gray-400 tracking-widest mb-6">Registro de Notas</h3>
                             <div className="space-y-4 mb-6 bg-amber-50/50 dark:bg-gray-900/30 p-5 rounded-3xl border-2 border-dashed border-amber-200">
@@ -415,7 +453,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 {studentGrades.map(g => (
                                     <div key={g.id} className="p-4 rounded-3xl border border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800 shadow-sm group">
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[9px] font-black text-blue-500 uppercase truncate tracking-tighter">{(adminCourses.find(c => c.id === g.curso_id)?.nombre || g.curso_id)}</p>
+                                            <p className="text-[9px] font-black text-blue-500 uppercase truncate">{(adminCourses.find(c => c.id === g.curso_id)?.nombre || g.curso_id)}</p>
                                             <p className="text-xs font-bold text-gray-700 dark:text-gray-300">{g.titulo_asignacion}</p>
                                         </div>
                                         <div className="flex items-center gap-3 ml-4">
@@ -426,11 +464,38 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 ))}
                             </div>
                         </div>
+
+                        {/* 4. PAGOS (NUEVO) */}
+                        <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border-t-8 border-indigo-500 h-[600px] flex flex-col">
+                            <h3 className="font-black uppercase text-[10px] text-gray-400 tracking-widest mb-6">Historial Financiero</h3>
+                            <div className="space-y-4 mb-6 bg-indigo-50/50 dark:bg-gray-900/30 p-5 rounded-3xl border-2 border-dashed border-indigo-200">
+                                <input type="number" value={newPayAmount} onChange={e => setNewPayAmount(Number(e.target.value))} className="w-full p-3.5 text-xs border border-gray-200 dark:border-gray-700 rounded-2xl dark:bg-gray-700 font-black text-center" placeholder="Monto $"/>
+                                <input type="text" value={newPayDesc} onChange={e => setNewPayDesc(e.target.value)} className="w-full p-3.5 text-xs border border-gray-200 dark:border-gray-700 rounded-2xl dark:bg-gray-700 font-bold" placeholder="Concepto (Ej: Octubre)"/>
+                                <select value={newPayMethod} onChange={e => setNewPayMethod(e.target.value)} className="w-full p-3.5 text-xs border border-gray-200 dark:border-gray-700 rounded-2xl dark:bg-gray-700 font-black uppercase tracking-tighter shadow-sm">
+                                    <option value="Zelle">Zelle</option><option value="Efectivo">Efectivo</option><option value="Pago Móvil">Pago Móvil</option>
+                                </select>
+                                <button onClick={handleAddPayment} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-[10px] uppercase shadow-lg hover:bg-indigo-700 tracking-widest transition-all">Registrar Pago</button>
+                            </div>
+                            <div className="space-y-3 overflow-y-auto flex-1 pr-2 custom-scrollbar">
+                                {studentPayments.map(p => (
+                                    <div key={p.id} className="p-4 rounded-3xl border border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800 shadow-sm group">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-black text-indigo-500 uppercase">{new Date(p.date).toLocaleDateString()}</p>
+                                            <p className="text-xs font-bold text-gray-700 dark:text-gray-300">{p.description}</p>
+                                        </div>
+                                        <div className="flex items-center gap-3 ml-4">
+                                            <span className="text-xs font-black px-3 py-1.5 rounded-xl bg-green-100 text-green-700 shadow-sm">${p.amount}</span>
+                                            <button onClick={() => handleDeletePayment(p.id)} className="text-gray-300 hover:text-red-500 transition-all p-2 group-hover:bg-red-50 rounded-xl"><TrashIcon className="w-5 h-5"/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* VISTA MATERIAS */}
+            {/* VISTA MATERIAS (GENERAL) */}
             {activeTab === 'courses' && (
                 <div className="space-y-6 animate-fade-in">
                     {editingCourse ? (
@@ -449,14 +514,14 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             <div className="flex justify-end gap-4 pt-6"><button onClick={() => setEditingCourse(null)} className="px-8 py-4 text-xs font-black uppercase tracking-widest bg-gray-100 dark:bg-gray-700 rounded-2xl hover:bg-gray-200 transition-all">Cancelar</button><button onClick={handleUpdateCourse} className="px-10 py-4 text-xs bg-blue-600 text-white font-black rounded-2xl shadow-2xl hover:bg-blue-700 transition-all uppercase tracking-widest">Guardar Cambios</button></div>
                         </div>
                     ) : (
-                        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border dark:border-gray-700"><table className="w-full"><thead className="bg-gray-50 dark:bg-gray-900 text-[10px] font-black uppercase text-gray-400 tracking-widest"><tr><th className="px-8 py-6">Materia</th><th className="px-8 py-6">Profesor</th><th className="px-8 py-6 text-right"></th></tr></thead><tbody className="divide-y dark:divide-gray-700">
+                        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border dark:border-gray-700"><table className="w-full text-left"><thead className="bg-gray-50 dark:bg-gray-900 text-[10px] font-black uppercase text-gray-400 tracking-widest"><tr><th className="px-8 py-6">Materia</th><th className="px-8 py-6">Profesor</th><th className="px-8 py-6 text-right"></th></tr></thead><tbody className="divide-y dark:divide-gray-700">
                             {adminCourses.map(c => (<tr key={c.id} className="hover:bg-blue-50/20 dark:hover:bg-gray-700/20 transition-all"><td className="px-8 py-6 font-black text-sm text-gray-800 dark:text-gray-200">{c.nombre}</td><td className="px-8 py-6 text-xs text-gray-400 font-black uppercase tracking-tighter">{c.profesor}</td><td className="px-8 py-6 text-right flex justify-end gap-3"><button onClick={() => setEditingCourse(c)} className="text-blue-600 font-black uppercase text-[10px] hover:bg-blue-50 px-4 py-2 rounded-xl transition-all tracking-widest">Editar</button><button onClick={() => handleDeleteCourse(c.id)} className="text-red-300 hover:text-red-600 p-2 transition-all"><TrashIcon className="w-5 h-5"/></button></td></tr>))}
                         </tbody></table></div>
                     )}
                 </div>
             )}
             
-            {/* TAREAS */}
+            {/* TAREAS, EXAMENES, ASISTENCIA, ANUNCIOS (IGUAL QUE ANTES) */}
             {activeTab === 'assignments' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-blue-500 h-fit space-y-6">
@@ -474,7 +539,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
-            {/* EXAMENES */}
             {activeTab === 'exams' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-red-500 h-fit space-y-6">
@@ -492,7 +556,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
-            {/* ASISTENCIA */}
             {activeTab === 'attendance' && (
                 <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-blue-500 space-y-8 animate-fade-in">
                     <h3 className="font-black uppercase text-[10px] text-gray-400 tracking-widest">Control Diario</h3>
@@ -515,12 +578,11 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
-            {/* ANUNCIOS */}
             {activeTab === 'announcements' && (
                 <div className="space-y-8 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-indigo-500 space-y-6">
                         <h3 className="font-black text-xs text-gray-400 uppercase tracking-widest">Comunicado LTS</h3>
-                        <div className="flex flex-col md:flex-row gap-4"><input type="text" value={newAnnounceMsg} onChange={e => setNewAnnounceMsg(e.target.value)} placeholder="Ej: Nueva fecha para la conferencia académica..." className="flex-1 p-4 text-xs border border-gray-100 rounded-2xl dark:bg-gray-700 font-bold focus:ring-2 focus:ring-indigo-500 outline-none"/><button onClick={handleAddAnnounce} className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl hover:bg-indigo-700 tracking-widest transition-all flex items-center justify-center"><MailIcon className="w-5 h-5 mr-3"/>Publicar</button></div>
+                        <div className="flex flex-col md:flex-row gap-4"><input type="text" value={newAnnounceMsg} onChange={e => setNewAnnounceMsg(e.target.value)} placeholder="Anuncio institucional..." className="flex-1 p-4 text-xs border border-gray-100 rounded-2xl dark:bg-gray-700 font-bold focus:ring-2 focus:ring-indigo-500 outline-none"/><button onClick={handleAddAnnounce} className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl hover:bg-indigo-700 tracking-widest transition-all flex items-center justify-center"><MailIcon className="w-5 h-5 mr-3"/>Publicar</button></div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border dark:border-gray-700"><table className="w-full text-left"><thead className="bg-gray-50 dark:bg-gray-900 text-[10px] font-black uppercase text-gray-400 tracking-widest"><tr><th className="px-8 py-5">Fecha</th><th className="px-8 py-5">Mensaje</th><th className="px-8 py-5"></th></tr></thead><tbody className="divide-y dark:divide-gray-700">
                         {announcements.map(m => (<tr key={m.id} className="text-xs hover:bg-gray-50 transition-all"><td className="px-8 py-5 text-gray-400 font-black uppercase">{new Date(m.fecha_envio).toLocaleDateString()}</td><td className="px-8 py-5 font-bold text-gray-700 dark:text-gray-300">{m.asunto}</td><td className="px-8 py-5 text-right"><button onClick={async () => { if(confirm('¿Eliminar anuncio?')) { await supabase.from('mensajes').delete().eq('id', m.id); fetchAnnouncements(); } }} className="text-red-300 hover:text-red-600 p-2 transition-all"><TrashIcon className="w-5 h-5"/></button></td></tr>))}
