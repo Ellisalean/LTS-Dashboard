@@ -52,8 +52,8 @@ const ActiveCoursesWidget: React.FC<{ courses: Course[], onClick: (id: string) =
                         onClick={() => onClick(course.id)}
                         className="group relative bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden border border-gray-100 dark:border-gray-700 hover:border-blue-400"
                     >
-                        {/* Thumbnail Area */}
-                        <div className="h-32 relative overflow-hidden bg-gray-100 dark:bg-gray-900">
+                        {/* Thumbnail Area - Altura fija estricta */}
+                        <div className="h-32 w-full relative overflow-hidden bg-gray-100 dark:bg-gray-900 shrink-0">
                             {course.imageUrl ? (
                                 <img src={course.imageUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={course.title} />
                             ) : (
@@ -70,16 +70,15 @@ const ActiveCoursesWidget: React.FC<{ courses: Course[], onClick: (id: string) =
                         </div>
 
                         {/* Content Area */}
-                        <div className="p-4">
+                        <div className="p-4 flex flex-col h-44">
                             <h3 className="font-bold text-gray-900 dark:text-white text-sm line-clamp-1 group-hover:text-blue-600 transition-colors">
                                 {course.title}
                             </h3>
                             <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 line-clamp-2 h-8">
-                                {course.description || "Iniciado recientemente..."}
+                                {course.description || "Curso activo en tu plataforma."}
                             </p>
                             
-                            {/* Decorative Progress Bar */}
-                            <div className="mt-4">
+                            <div className="mt-auto">
                                 <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1 uppercase">
                                     <span>Progreso</span>
                                     <span>En curso</span>
@@ -87,21 +86,21 @@ const ActiveCoursesWidget: React.FC<{ courses: Course[], onClick: (id: string) =
                                 <div className="h-1.5 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                                     <div className="h-full bg-blue-500 rounded-full w-1/3 animate-pulse"></div>
                                 </div>
-                            </div>
 
-                            <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between">
-                                <div className="flex items-center">
-                                    <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center mr-2">
-                                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                                            {course.professor.charAt(0)}
+                                <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between">
+                                    <div className="flex items-center">
+                                        <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center mr-2 shrink-0">
+                                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                                                {course.professor.charAt(0)}
+                                            </span>
+                                        </div>
+                                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 truncate w-20">
+                                            {course.professor.split(' ')[0]}
                                         </span>
                                     </div>
-                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 truncate w-24">
-                                        Prof. {course.professor.split(' ')[0]}
-                                    </span>
-                                </div>
-                                <div className="bg-blue-50 dark:bg-blue-900/30 p-1.5 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                                    <ChevronRightIcon className="h-4 w-4" />
+                                    <div className="bg-blue-50 dark:bg-blue-900/30 p-1.5 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                        <ChevronRightIcon className="h-4 w-4" />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -148,7 +147,7 @@ const CalendarWidget: React.FC<{ events: CalendarEvent[] }> = ({ events }) => {
 
 const MessagesWidget: React.FC<{ messages: Message[] }> = ({ messages }) => (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-full">
-        <h2 className="text-xl font-bold flex items-center mb-4"><MailIcon className="h-6 w-6 mr-3 text-blue-500"/>Anuncios de Dirección</h2>
+        <h2 className="text-xl font-bold flex items-center mb-4"><MailIcon className="h-6 w-6 mr-3 text-blue-500"/>Anuncios Académicos</h2>
         <div className="space-y-4">
             {messages.map(message => (
                 <div key={message.id} className={`flex items-start space-x-3 p-3 rounded-lg border border-transparent hover:border-gray-100 dark:hover:border-gray-700 transition-all ${!message.isRead ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>

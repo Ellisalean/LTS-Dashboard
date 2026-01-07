@@ -18,7 +18,7 @@ interface DataState {
     calendarEvents: CalendarEvent[];
     loading: boolean;
     unreadChatCount: number;
-    financialStatus: FinancialStatus; // Nuevo campo
+    financialStatus: FinancialStatus;
 }
 
 export const useRealtimeData = (user: User | null) => {
@@ -41,51 +41,41 @@ export const useRealtimeData = (user: User | null) => {
 
         const fetchData = async () => {
             try {
-                // 1. Obtener ID del usuario primero (CRUCIAL para personalizar datos)
+                // 1. Obtener ID del usuario
                 const { data: dbUser } = await supabase.from('estudiantes').select('id, matricula').eq('nombre', user.name).single();
                 const userId = dbUser?.id;
 
-                // 2. Obtener TODAS las notas del usuario (Necesarias para calcular el estado de los cursos)
-                let dbGrades: any[] = [];
-                if (userId) {
-                    const { data } = await supabase.from('notas').select('*').eq('estudiante_id', userId);
-                    dbGrades = data || [];
-                }
+                if (!userId) return;
 
-                // 3. Obtener Cursos y MAPEAR estado dinámicamente
+                // 2. Obtener Inscripciones (Cursos Activos)
+                const { data: dbInscripciones } = await supabase.from('inscripciones').select('curso_id').eq('estudiante_id', userId);
+                const activeCourseIds = new Set((dbInscripciones || []).map(i => i.curso_id));
+
+                // 3. Obtener Cursos
                 const { data: dbCourses } = await supabase.from('cursos').select('*');
                 const courseMap = (dbCourses || []).reduce((acc: any, c: any) => {
                     acc[c.id] = c.nombre;
                     return acc;
                 }, {});
 
-                // Obtener asistencias para activar cursos "En Curso"
-                let dbAttendance: any[] = [];
-                if (userId) {
-                    const { data } = await supabase.from('asistencias').select('curso_id').eq('estudiante_id', userId);
-                    dbAttendance = data || [];
-                }
-                const attendedCourseIds = new Set(dbAttendance.map(a => a.curso_id));
+                // 4. Obtener Notas para ver si completó
+                const { data: dbGrades } = await supabase.from('notas').select('*').eq('estudiante_id', userId);
+                const gradesByCourse = (dbGrades || []).reduce((acc: any, g: any) => {
+                    if (!acc[g.curso_id]) acc[g.curso_id] = [];
+                    acc[g.curso_id].push(g);
+                    return acc;
+                }, {});
 
                 const courses: Course[] = (dbCourses || []).map((c: any) => {
-                    // LÓGICA INTELIGENTE DE ESTADO
-                    const myGradesInThisCourse = dbGrades.filter((g: any) => g.curso_id === c.id);
-                    
                     let computedStatus = CourseStatus.NoIniciado;
-
-                    // Si tiene notas O tiene asistencia registrada, está en curso
-                    if (myGradesInThisCourse.length > 0 || attendedCourseIds.has(c.id)) {
+                    
+                    if (activeCourseIds.has(c.id)) {
                         computedStatus = CourseStatus.EnCurso;
-
-                        // Verificar si ya terminó (Si tiene una nota con título "Final", "Definitiva", etc.)
-                        const hasFinalGrade = myGradesInThisCourse.some((g: any) => {
-                            const title = (g.titulo_asignacion || '').toLowerCase();
-                            return title.includes('final') || title.includes('definitiva') || title.includes('cierre') || title.includes('completado');
-                        });
-
-                        if (hasFinalGrade) {
-                            computedStatus = CourseStatus.Completado;
-                        }
+                        // Si tiene nota final, completado
+                        const hasFinal = (gradesByCourse[c.id] || []).some((g: any) => 
+                            (g.titulo_asignacion || '').toLowerCase().includes('final')
+                        );
+                        if (hasFinal) computedStatus = CourseStatus.Completado;
                     }
 
                     return {
@@ -93,15 +83,15 @@ export const useRealtimeData = (user: User | null) => {
                         title: c.nombre,
                         professor: c.profesor,
                         credits: c.creditos,
-                        status: computedStatus, // Usamos el estado calculado, ignoramos el de la DB global
+                        status: computedStatus,
                         description: c.descripcion,
                         detailedContent: c.contenido_detallado,
-                        imageUrl: c.image_url // Mapeo de la nueva columna de Supabase
+                        imageUrl: c.image_url
                     };
                 });
 
-                // 4. Asignaciones
-                const { data: dbAssign } = await supabase.from('asignaciones').select('*');
+                // 5. Asignaciones (Filtradas por cursos activos del alumno)
+                const { data: dbAssign } = await supabase.from('asignaciones').select('*').in('curso_id', Array.from(activeCourseIds));
                 const assignments: Assignment[] = (dbAssign || []).map((a: any) => ({
                     id: a.id,
                     courseId: a.curso_id,
@@ -111,8 +101,8 @@ export const useRealtimeData = (user: User | null) => {
                     isSubmitted: a.entregado
                 }));
 
-                // 5. Exámenes
-                const { data: dbExams } = await supabase.from('examenes').select('*');
+                // 6. Exámenes
+                const { data: dbExams } = await supabase.from('examenes').select('*').in('curso_id', Array.from(activeCourseIds));
                 const exams: Exam[] = (dbExams || []).map((e: any) => ({
                     id: e.id,
                     courseId: e.curso_id,
@@ -122,8 +112,8 @@ export const useRealtimeData = (user: User | null) => {
                     time: e.hora
                 }));
 
-                // 6. Formatear Notas para la vista
-                const grades: Grade[] = dbGrades.map((g: any) => ({
+                // 7. Notas
+                const grades: Grade[] = (dbGrades || []).map((g: any) => ({
                     id: g.id,
                     courseId: g.curso_id,
                     course: courseMap[g.curso_id] || g.curso_id,
@@ -133,7 +123,7 @@ export const useRealtimeData = (user: User | null) => {
                     studentName: user.name
                 }));
 
-                // 7. Mensajes (Anuncios)
+                // 8. Mensajes
                 const { data: dbMsgs } = await supabase.from('mensajes').select('*').order('fecha_envio', { ascending: false });
                 const messages: Message[] = (dbMsgs || []).map((m: any) => ({
                     id: m.id,
@@ -143,76 +133,22 @@ export const useRealtimeData = (user: User | null) => {
                     timestamp: new Date(m.fecha_envio).toLocaleDateString()
                 }));
 
-                // 8. CHAT: Contar mensajes no leídos
-                let unreadChatCount = 0;
-                if (userId) {
-                    const { count } = await supabase
-                        .from('chat_mensajes')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('receiver_id', userId)
-                        .eq('leido', false);
-                    unreadChatCount = count || 0;
-                }
-
-                // 9. CÁLCULO FINANCIERO (Para Notificaciones Globales)
-                let financialStatus: FinancialStatus = { hasDebt: false, totalDebt: 0, monthsBehind: 0 };
-                if (userId) {
-                    // Obtener pagos
-                    const { data: paymentData } = await supabase.from('pagos').select('*').eq('student_id', userId);
-                    const allPayments = (paymentData || []) as Payment[];
-                    
-                    // CONFIGURACIÓN DINÁMICA (CORREGIDA PARA TYPE 'OTHER')
-                    const planConfig = allPayments.find(p => p.type === 'other' && p.description === 'Configuración Plan Mensual');
-                    
-                    const monthlyFee = planConfig ? planConfig.amount : 25;
-                    // Recuperar fecha de inicio configurada o usar default (OCTUBRE)
-                    let startDate = new Date('2024-10-01'); // Default Octubre
-                    if(planConfig && planConfig.date) {
-                         startDate = new Date(planConfig.date);
-                    }
-
-                    // Calcular pagado (sin el registro de config)
-                    const totalPaid = allPayments
-                        .filter(p => !(p.type === 'other' && p.description === 'Configuración Plan Mensual'))
-                        .reduce((acc, curr) => acc + curr.amount, 0);
-
-                    // Lógica Dinámica
-                    const now = new Date();
-                    let monthsDiff = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
-                    if (monthsDiff < 0) monthsDiff = 0;
-                    const totalMonths = monthsDiff + 1; // +1 incluye mes corriente
-
-                    const expected = 10 + (monthlyFee * totalMonths); // $10 ins + $Plan * meses
-                    const debt = Math.max(0, expected - totalPaid);
-                    
-                    financialStatus = {
-                        hasDebt: debt > 0,
-                        totalDebt: debt,
-                        monthsBehind: Math.floor(debt / monthlyFee) // Estimado
-                    };
-                }
-
-                // 10. Calendario
-                const assignmentEvents: CalendarEvent[] = assignments.map(a => ({
-                    id: `assign-${a.id}`,
-                    title: `Entrega: ${a.title}`,
-                    date: a.dueDate,
-                    type: 'assignment'
-                }));
-                const examEvents: CalendarEvent[] = exams.map(e => ({
-                    id: `exam-${e.id}`,
-                    title: `Exámen: ${e.title}`,
-                    date: e.date,
-                    type: 'exam'
-                }));
+                // 9. Chat
+                const { count } = await supabase.from('chat_mensajes').select('*', { count: 'exact', head: true }).eq('receiver_id', userId).eq('leido', false);
                 
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                
-                const calendarEvents = [...assignmentEvents, ...examEvents]
-                    .filter(event => new Date(event.date) >= today)
-                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                    .slice(0, 5);
+                // 10. Finanzas
+                const { data: paymentData } = await supabase.from('pagos').select('*').eq('student_id', userId);
+                const allPayments = (paymentData || []) as Payment[];
+                const planConfig = allPayments.find(p => p.type === 'other' && p.description === 'Configuración Plan Mensual');
+                const monthlyFee = planConfig ? planConfig.amount : 25;
+                let startDate = new Date('2024-10-01');
+                if(planConfig?.date) startDate = new Date(planConfig.date);
+                const totalPaid = allPayments.filter(p => !(p.type === 'other' && p.description === 'Configuración Plan Mensual')).reduce((acc, curr) => acc + curr.amount, 0);
+                const now = new Date();
+                let monthsDiff = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
+                if (monthsDiff < 0) monthsDiff = 0;
+                const expected = 10 + (monthlyFee * (monthsDiff + 1));
+                const debt = Math.max(0, expected - totalPaid);
 
                 if (isMounted) {
                     setData({
@@ -221,10 +157,10 @@ export const useRealtimeData = (user: User | null) => {
                         exams,
                         grades,
                         messages,
-                        calendarEvents,
+                        calendarEvents: [], // Se calcula abajo
                         loading: false,
-                        unreadChatCount,
-                        financialStatus
+                        unreadChatCount: count || 0,
+                        financialStatus: { hasDebt: debt > 0, totalDebt: debt, monthsBehind: Math.floor(debt / monthlyFee) }
                     });
                 }
 
@@ -235,24 +171,8 @@ export const useRealtimeData = (user: User | null) => {
         };
 
         fetchData();
-
-        // Suscripción a cambios en tiempo real
-        const channels = supabase.channel('custom-all-channel')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public' },
-                (payload) => {
-                    console.log('Change received!', payload);
-                    fetchData(); 
-                }
-            )
-            .subscribe();
-
-        return () => {
-            isMounted = false;
-            supabase.removeChannel(channels);
-        };
-
+        const channel = supabase.channel('global').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
+        return () => { isMounted = false; supabase.removeChannel(channel); };
     }, [user]);
 
     return data;
