@@ -95,7 +95,8 @@ export const useRealtimeData = (user: User | null) => {
                         credits: c.creditos,
                         status: computedStatus, // Usamos el estado calculado, ignoramos el de la DB global
                         description: c.descripcion,
-                        detailedContent: c.contenido_detallado // Nuevo campo mapeado
+                        detailedContent: c.contenido_detallado,
+                        imageUrl: c.image_url // Mapeo de la nueva columna de Supabase
                     };
                 });
 

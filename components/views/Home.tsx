@@ -1,13 +1,15 @@
 
 import React from 'react';
-import { User, CalendarEvent, Message } from '../../types.ts';
-import { CalendarIcon, MailIcon, ClockIcon } from '../Icons.tsx';
+import { User, CalendarEvent, Message, Course, CourseStatus } from '../../types.ts';
+import { CalendarIcon, MailIcon, ClockIcon, BookOpenIcon, ChevronRightIcon } from '../Icons.tsx';
 import { DEGREE_PROGRAM_NAME } from '../../constants.ts';
 
 interface HomeProps {
     user: User;
     events: CalendarEvent[];
     messages: Message[];
+    courses: Course[];
+    onCourseClick: (courseId: string) => void;
 }
 
 const WelcomeHeader: React.FC<{ user: User }> = ({ user }) => (
@@ -28,6 +30,53 @@ const WelcomeHeader: React.FC<{ user: User }> = ({ user }) => (
     </div>
 );
 
+const ActiveCoursesWidget: React.FC<{ courses: Course[], onClick: (id: string) => void }> = ({ courses, onClick }) => {
+    const activeCourses = courses.filter(c => c.status === CourseStatus.EnCurso);
+
+    if (activeCourses.length === 0) return null;
+
+    return (
+        <div className="space-y-4 mb-8">
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
+                <BookOpenIcon className="h-6 w-6 mr-3 text-blue-500" />
+                Materias en curso
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {activeCourses.map(course => (
+                    <div 
+                        key={course.id}
+                        onClick={() => onClick(course.id)}
+                        className="group bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden cursor-pointer transform hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-blue-500/50"
+                    >
+                        <div className="h-24 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
+                            {course.imageUrl ? (
+                                <img src={course.imageUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={course.title} />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 opacity-80">
+                                    <BookOpenIcon className="h-10 w-10 text-white opacity-40" />
+                                </div>
+                            )}
+                            <div className="absolute top-2 right-2">
+                                <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">ACTIVO</span>
+                            </div>
+                        </div>
+                        <div className="p-4">
+                            <h3 className="font-bold text-gray-800 dark:text-white text-sm line-clamp-1 group-hover:text-blue-500 transition-colors">{course.title}</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2 h-8 leading-relaxed">
+                                {course.description || "Sin descripción disponible."}
+                            </p>
+                            <div className="mt-3 flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Prof. {course.professor.split(' ')[0]}</span>
+                                <ChevronRightIcon className="h-4 w-4 text-blue-500 transform group-hover:translate-x-1 transition-transform" />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 const CalendarWidget: React.FC<{ events: CalendarEvent[] }> = ({ events }) => {
     const getMonthAbbreviation = (dateStr: string) => {
         const date = new Date(dateStr);
@@ -42,7 +91,7 @@ const CalendarWidget: React.FC<{ events: CalendarEvent[] }> = ({ events }) => {
     }
 
     return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-full">
         <h2 className="text-xl font-bold flex items-center mb-4"><CalendarIcon className="h-6 w-6 mr-3 text-blue-500"/>Agenda Próxima</h2>
         <div className="space-y-4">
             {events.map(event => (
@@ -64,7 +113,7 @@ const CalendarWidget: React.FC<{ events: CalendarEvent[] }> = ({ events }) => {
 };
 
 const MessagesWidget: React.FC<{ messages: Message[] }> = ({ messages }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md h-full">
         <h2 className="text-xl font-bold flex items-center mb-4"><MailIcon className="h-6 w-6 mr-3 text-blue-500"/>Mensajes Recientes</h2>
         <div className="space-y-4">
             {messages.map(message => (
@@ -83,10 +132,13 @@ const MessagesWidget: React.FC<{ messages: Message[] }> = ({ messages }) => (
 );
 
 
-const Home: React.FC<HomeProps> = ({ user, events, messages }) => {
+const Home: React.FC<HomeProps> = ({ user, events, messages, courses, onCourseClick }) => {
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 animate-fade-in">
             <WelcomeHeader user={user} />
+            
+            <ActiveCoursesWidget courses={courses} onClick={onCourseClick} />
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <CalendarWidget events={events} />
                 <MessagesWidget messages={messages} />

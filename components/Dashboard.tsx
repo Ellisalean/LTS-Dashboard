@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { User, View } from '../types.ts';
 import Sidebar from './Sidebar.tsx';
@@ -23,9 +22,15 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     const [activeView, setActiveView] = useState<View>(View.Home);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar state
+    const [initialCourseId, setInitialCourseId] = useState<string | null>(null);
     
     // Obtener datos en tiempo real de Supabase
     const { courses, assignments, exams, grades, messages, calendarEvents, loading, unreadChatCount, financialStatus } = useRealtimeData(user);
+
+    const handleNavigateToCourse = (courseId: string) => {
+        setInitialCourseId(courseId);
+        setActiveView(View.Courses);
+    };
 
     if (loading) {
         return (
@@ -39,9 +44,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     const renderView = () => {
         switch (activeView) {
             case View.Home:
-                return <Home user={user} events={calendarEvents} messages={messages} />;
+                return <Home user={user} events={calendarEvents} messages={messages} courses={courses} onCourseClick={handleNavigateToCourse} />;
             case View.Courses:
-                return <Courses user={user} courses={courses} assignments={assignments} exams={exams} grades={grades} />;
+                return (
+                    <Courses 
+                        user={user} 
+                        courses={courses} 
+                        assignments={assignments} 
+                        exams={exams} 
+                        grades={grades} 
+                        targetCourseId={initialCourseId}
+                        onClearTarget={() => setInitialCourseId(null)}
+                    />
+                );
             case View.Assignments:
                 return <Assignments assignments={assignments} />;
             case View.Exams:
@@ -57,7 +72,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             case View.TeacherPanel:
                 return <TeacherPanel user={user} />;
             default:
-                return <Home user={user} events={calendarEvents} messages={messages} />;
+                return <Home user={user} events={calendarEvents} messages={messages} courses={courses} onCourseClick={handleNavigateToCourse} />;
         }
     };
 
@@ -68,6 +83,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 setActiveView={(view) => {
                     setActiveView(view);
                     setIsSidebarOpen(false); // Close sidebar on selection (mobile)
+                    if(view !== View.Courses) setInitialCourseId(null);
                 }} 
                 userRole={user.role} 
                 unreadChatCount={unreadChatCount}

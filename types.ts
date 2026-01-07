@@ -1,5 +1,4 @@
 
-
 export interface User {
   name: string;
   email: string;
@@ -27,7 +26,8 @@ export interface Course {
   credits: number;
   status: CourseStatus;
   description: string;
-  detailedContent?: string; // Nuevo campo para la reseña larga
+  detailedContent?: string;
+  imageUrl?: string; // Nueva propiedad para la miniatura
 }
 
 export interface Assignment {
