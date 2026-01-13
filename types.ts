@@ -27,7 +27,16 @@ export interface Course {
   status: CourseStatus;
   description: string;
   detailedContent?: string;
-  imageUrl?: string; // Nueva propiedad para la miniatura
+  imageUrl?: string;
+}
+
+export interface Resource {
+    id: string;
+    courseId: string;
+    title: string;
+    url: string;
+    type: 'pdf' | 'video' | 'audio' | 'link';
+    createdAt?: string;
 }
 
 export interface Assignment {
@@ -86,8 +95,8 @@ export interface Payment {
     student_id: string;
     amount: number;
     date: string;
-    description: string; // "Inscripción", "Mensualidad Septiembre", etc.
-    method: string; // "Zelle", "Efectivo", "Transferencia"
+    description: string;
+    method: string;
     reference?: string;
     type: 'inscription' | 'tuition' | 'other' | 'plan_config';
     verified: boolean;
