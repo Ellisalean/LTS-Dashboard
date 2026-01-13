@@ -1,6 +1,9 @@
+
 {
   "name": "Latin Theological Seminary Dashboard",
-  "description": "A student dashboard for the Latin Theological Seminary, providing access to courses, assignments, exams, and grades.",
-  "requestFramePermissions": [],
+  "description": "Panel de gestión académica y financiera para el Latin Theological Seminary.",
+  "requestFramePermissions": [
+    "camera"
+  ],
   "prompt": ""
 }

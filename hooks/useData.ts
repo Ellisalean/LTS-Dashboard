@@ -69,20 +69,29 @@ export const useRealtimeData = (user: User | null) => {
                     id: r.id, courseId: r.course_id, title: r.titulo, url: r.url, type: r.tipo
                 }));
 
-                const processedCourses = dbCourses.map((c: any) => ({
-                    id: c.id,
-                    title: c.nombre,
-                    professor: c.profesor,
-                    credits: c.creditos,
-                    status: (dbGrades.some(g => g.curso_id === c.id && (g.titulo_asignacion || '').toLowerCase().includes('final'))) ? CourseStatus.Completado : (activeCourseIds.has(c.id) ? CourseStatus.EnCurso : CourseStatus.NoIniciado),
-                    description: c.descripcion,
-                    detailedContent: c.contenido_detallado,
-                    imageUrl: c.image_url
-                }));
+                const processedCourses = dbCourses.map((c: any) => {
+                    const courseGrades = dbGrades.filter(g => g.curso_id === c.id);
+                    // Lógica: Si tiene una nota que diga "final" o "aprobada", está completado
+                    const isCompleted = courseGrades.some(g => 
+                        (g.titulo_asignacion || '').toLowerCase().includes('final') || 
+                        (g.titulo_asignacion || '').toLowerCase().includes('examen final')
+                    );
 
-                // Finanzas
+                    return {
+                        id: c.id,
+                        title: c.nombre,
+                        professor: c.profesor,
+                        credits: c.creditos,
+                        status: isCompleted ? CourseStatus.Completado : (activeCourseIds.has(c.id) ? CourseStatus.EnCurso : CourseStatus.NoIniciado),
+                        description: c.descripcion,
+                        detailedContent: c.contenido_detallado,
+                        imageUrl: c.image_url
+                    };
+                });
+
+                // Finanzas simplificadas para el Hook (la vista FinancialView tiene el cálculo detallado)
                 const totalPaid = (paymentsRes.data || []).reduce((acc: number, p: any) => acc + p.amount, 0);
-                const debt = Math.max(0, 150 - totalPaid); // Ejemplo de cálculo de deuda simplificado
+                const debt = Math.max(0, 150 - totalPaid);
 
                 if (isMounted) {
                     setData({
