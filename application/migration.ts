@@ -1,4 +1,5 @@
 
+
 import { supabase } from './supabase.ts';
 import { RAW_DATA } from './data.ts';
 
@@ -18,30 +19,39 @@ const cleanData = (data: any[]) => {
 export const migrateDataToSupabase = async (log: (msg: string) => void) => {
     log("Verificando conexión con base de datos...");
     try {
+        // 0. Pre-check connection
         const { error: healthError } = await supabase.from('estudiantes').select('count', { count: 'exact', head: true });
-        if (healthError) throw new Error(`No se pudo conectar. Error: ${healthError.message}`);
+        if (healthError) {
+             // Si falla estudiantes, probablemente falten las tablas
+             throw new Error(`No se pudo conectar a la tabla 'estudiantes'. ¿Ejecutaste el script SQL en Supabase? Error: ${healthError.message}`);
+        }
         log("Conexión exitosa. Tablas detectadas.");
 
+        // NEW: Check/Create Payments Table (Conceptually - actually we just check if we can select from it)
+        // Since Supabase doesn't allow CREATE TABLE via JS Client typically without SQL functions, 
+        // we assume the user might need to run SQL if it fails. 
+        // However, we can try to insert a dummy payment if it exists to verify.
         const { error: paymentCheck } = await supabase.from('pagos').select('count', { count: 'exact', head: true });
         if (paymentCheck && paymentCheck.code === '42P01') {
             log("⚠️ LA TABLA 'pagos' NO EXISTE. Por favor ejecuta el SQL en Supabase Editor.");
-        }
-
-        const { error: resourceCheck } = await supabase.from('recursos').select('count', { count: 'exact', head: true });
-        if (resourceCheck && resourceCheck.code === '42P01') {
-            log("⚠️ LA TABLA 'recursos' NO EXISTE. Ejecuta: create table recursos (id uuid default gen_random_uuid() primary key, course_id text references cursos(id) on delete cascade, titulo text, url text, tipo text, created_at timestamptz default now());");
+            log("SQL: create table pagos (id uuid default gen_random_uuid() primary key, student_id uuid references estudiantes(id) on delete cascade, amount numeric, date date, description text, method text, reference text, type text, verified boolean default true, created_at timestamptz default now());");
         }
 
         // 1. Migrar Estudiantes
         log("Procesando Estudiantes...");
         const rawStudents = cleanData(RAW_DATA.Estudiantes);
         let studentsAdded = 0;
+        
         for (const s of rawStudents) {
             const { data: existing } = await supabase.from('estudiantes').select('id').eq('nombre', s.ESTUDIANTE).single();
             if (!existing) {
                 const { error: insertError } = await supabase.from('estudiantes').insert({
-                    nombre: s.ESTUDIANTE, email: s.Email || s.EMAIL || null, password: String(s.Contraseña || s.CONTRASEÑA || '').trim(),
-                    matricula: new Date().toISOString(), activo: (s.Activo || s.ACTIVO) === 'SI', avatar_url: `https://i.pravatar.cc/150?u=${encodeURIComponent(s.Email || s.ESTUDIANTE)}`
+                    nombre: s.ESTUDIANTE,
+                    email: s.Email || s.EMAIL || null,
+                    password: String(s.Contraseña || s.CONTRASEÑA || '').trim(),
+                    matricula: new Date().toISOString(),
+                    activo: (s.Activo || s.ACTIVO) === 'SI',
+                    avatar_url: `https://i.pravatar.cc/150?u=${encodeURIComponent(s.Email || s.ESTUDIANTE)}`
                 });
                 if (insertError) log(`Error insertando ${s.ESTUDIANTE}: ${insertError.message}`);
                 else studentsAdded++;
@@ -49,6 +59,7 @@ export const migrateDataToSupabase = async (log: (msg: string) => void) => {
         }
         log(`Estudiantes completados. Nuevos: ${studentsAdded}`);
 
+        // Recuperar mapa de estudiantes
         log("Generando mapa de IDs de estudiantes...");
         const { data: dbStudents } = await supabase.from('estudiantes').select('id, nombre');
         const studentMap = dbStudents?.reduce((acc: any, cur: any) => ({ ...acc, [cur.nombre]: cur.id }), {}) || {};
@@ -60,7 +71,14 @@ export const migrateDataToSupabase = async (log: (msg: string) => void) => {
         for (const c of rawCourses) {
              const { data: existing } = await supabase.from('cursos').select('id').eq('id', c.id).single();
              if(!existing) {
-                 const { error } = await supabase.from('cursos').insert({ id: c.id, nombre: c.nombre, profesor: c.profesor, creditos: c.créditos, estado: (c.estado || '').trim(), descripcion: c.descripcion });
+                 const { error } = await supabase.from('cursos').insert({
+                     id: c.id,
+                     nombre: c.nombre,
+                     profesor: c.profesor,
+                     creditos: c.créditos,
+                     estado: (c.estado || '').trim(),
+                     descripcion: c.descripcion
+                 });
                  if(error) log(`Error curso ${c.id}: ${error.message}`);
                  else coursesAdded++;
              }
@@ -72,10 +90,25 @@ export const migrateDataToSupabase = async (log: (msg: string) => void) => {
         const rawAssign = cleanData(RAW_DATA.Asignaciones);
         let assignAdded = 0;
         for (const a of rawAssign) {
-            const { data: existing } = await supabase.from('asignaciones').select('id').eq('titulo', a.titulo).eq('curso_id', a.curso_id).single();
+            const { data: existing } = await supabase.from('asignaciones')
+                .select('id')
+                .eq('titulo', a.titulo)
+                .eq('curso_id', a.curso_id)
+                .single();
+
             if(!existing) {
-                let date = null; if(a.fecha_entrega) { const parts = a.fecha_entrega.split('/'); if(parts.length === 3) date = `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`; }
-                const { error } = await supabase.from('asignaciones').insert({ curso_id: a.curso_id, titulo: a.titulo, fecha_entrega: date, entregado: a.entregado === true || a.entregado === 'SI' });
+                let date = null;
+                if(a.fecha_entrega) {
+                    const parts = a.fecha_entrega.split('/');
+                    if(parts.length === 3) date = `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`;
+                }
+
+                const { error } = await supabase.from('asignaciones').insert({
+                    curso_id: a.curso_id,
+                    titulo: a.titulo,
+                    fecha_entrega: date,
+                    entregado: a.entregado === true || a.entregado === 'SI'
+                });
                  if(error) log(`Error asignación ${a.titulo}: ${error.message}`);
                  else assignAdded++;
             }
@@ -87,10 +120,25 @@ export const migrateDataToSupabase = async (log: (msg: string) => void) => {
         const rawExams = cleanData(RAW_DATA.Examenes);
         let examsAdded = 0;
         for (const e of rawExams) {
-             const { data: existing } = await supabase.from('examenes').select('id').eq('titulo', e.titulo).eq('curso_id', e.curso_id).single();
+             const { data: existing } = await supabase.from('examenes')
+                .select('id')
+                .eq('titulo', e.titulo)
+                .eq('curso_id', e.curso_id)
+                .single();
+            
             if(!existing) {
-                 let date = null; if(e.fecha) { const parts = e.fecha.split('/'); if(parts.length === 3) date = `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`; }
-                const { error } = await supabase.from('examenes').insert({ curso_id: e.curso_id, titulo: e.titulo, fecha: date, hora: e.hora });
+                 let date = null;
+                if(e.fecha) {
+                    const parts = e.fecha.split('/');
+                    if(parts.length === 3) date = `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`;
+                }
+
+                const { error } = await supabase.from('examenes').insert({
+                    curso_id: e.curso_id,
+                    titulo: e.titulo,
+                    fecha: date,
+                    hora: e.hora
+                });
                 if(error) log(`Error examen ${e.titulo}: ${error.message}`);
                 else examsAdded++;
             }
@@ -98,18 +146,32 @@ export const migrateDataToSupabase = async (log: (msg: string) => void) => {
         log(`Exámenes completados. Nuevos: ${examsAdded}`);
 
         // 5. Migrar Notas
-        log("Procesando Notas...");
+        log("Procesando Notas (Esto puede tardar)...");
         const rawGrades = cleanData(RAW_DATA.Notas);
         let gradesAdded = 0;
         for (const g of rawGrades) {
             const studentId = studentMap[g.nombre_estudiante];
             if (studentId) {
-                 const { data: existing } = await supabase.from('notas').select('id').eq('estudiante_id', studentId).eq('curso_id', g.curso_id).eq('titulo_asignacion', g.titulo_asignacion).single();
+                 const { data: existing } = await supabase.from('notas')
+                    .select('id')
+                    .eq('estudiante_id', studentId)
+                    .eq('curso_id', g.curso_id)
+                    .eq('titulo_asignacion', g.titulo_asignacion)
+                    .single();
+
                 if(!existing) {
-                    const { error } = await supabase.from('notas').insert({ curso_id: g.curso_id, estudiante_id: studentId, titulo_asignacion: g.titulo_asignacion, puntuacion: g.puntuacion, puntuacion_maxima: g.puntuacion_maxima || 100 });
+                    const { error } = await supabase.from('notas').insert({
+                        curso_id: g.curso_id,
+                        estudiante_id: studentId,
+                        titulo_asignacion: g.titulo_asignacion,
+                        puntuacion: g.puntuacion,
+                        puntuacion_maxima: g.puntuacion_maxima || 100
+                    });
                     if(error) log(`Error nota ${g.nombre_estudiante}: ${error.message}`);
                     else gradesAdded++;
                 }
+            } else {
+                log(`Advertencia: No se encontró ID para estudiante ${g.nombre_estudiante}`);
             }
         }
         log(`Notas completadas. Nuevas: ${gradesAdded}`);
@@ -121,13 +183,19 @@ export const migrateDataToSupabase = async (log: (msg: string) => void) => {
         for (const m of rawMsgs) {
              const { data: existing } = await supabase.from('mensajes').select('id').eq('asunto', m.asunto).eq('remitente', m.remitente).single();
              if(!existing) {
-                 await supabase.from('mensajes').insert({ remitente: m.remitente, asunto: m.asunto, leido: m.leido === true, fecha_envio: new Date().toISOString() });
+                 await supabase.from('mensajes').insert({
+                     remitente: m.remitente,
+                     asunto: m.asunto,
+                     leido: m.leido === true,
+                     fecha_envio: new Date().toISOString()
+                 });
                  msgsAdded++;
              }
         }
         log(`Mensajes completados. Nuevos: ${msgsAdded}`);
         
         return { success: true, message: "Datos migrados correctamente a Supabase" };
+
     } catch (error) {
         log(`ERROR FATAL: ${(error as any).message}`);
         return { success: false, message: "Error al migrar datos" };

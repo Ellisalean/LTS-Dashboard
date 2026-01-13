@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { Course, User, Assignment, Exam, Grade, Resource } from '../../types.ts';
-import { ChevronLeftIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon, CheckCircleIcon, ClockIcon, BookOpenIcon, VideoIcon, MusicIcon, DocumentTextIcon, LinkIcon } from '../Icons.tsx';
+import { Course, User, Assignment, Exam, Grade } from '../../types.ts';
+import { ChevronLeftIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon, CheckCircleIcon, ClockIcon, BookOpenIcon } from '../Icons.tsx';
 
 interface CourseDetailProps {
     course: Course;
@@ -10,7 +10,6 @@ interface CourseDetailProps {
     allAssignments: Assignment[];
     allExams: Exam[];
     allGrades: Grade[];
-    allResources: Resource[];
 }
 
 const getGradeColor = (score: number, maxScore: number) => {
@@ -21,49 +20,8 @@ const getGradeColor = (score: number, maxScore: number) => {
     return 'text-red-500';
 };
 
-const ResourceIcon: React.FC<{ type: Resource['type'] }> = ({ type }) => {
-    switch (type) {
-        case 'video': return <VideoIcon className="h-6 w-6 text-red-500" />;
-        case 'pdf': return <DocumentTextIcon className="h-6 w-6 text-blue-500" />;
-        case 'audio': return <MusicIcon className="h-6 w-6 text-purple-500" />;
-        default: return <LinkIcon className="h-6 w-6 text-gray-500" />;
-    }
-};
-
-const ResourcesSection: React.FC<{ resources: Resource[] }> = ({ resources }) => {
-    if (resources.length === 0) return null;
-
-    return (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md animate-fade-in border-l-4 border-indigo-500">
-            <h3 className="text-xl font-bold flex items-center mb-6 text-gray-900 dark:text-white">
-                <LinkIcon className="h-6 w-6 mr-3 text-indigo-500" />
-                Materiales y Recursos de Clase
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {resources.map((resource) => (
-                    <a 
-                        key={resource.id} 
-                        href={resource.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-transparent hover:border-indigo-400 hover:bg-white dark:hover:bg-gray-700 transition-all group shadow-sm"
-                    >
-                        <div className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-inner group-hover:scale-110 transition-transform">
-                            <ResourceIcon type={resource.type} />
-                        </div>
-                        <div className="ml-4 overflow-hidden">
-                            <p className="font-bold text-gray-800 dark:text-white truncate text-sm">{resource.title}</p>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{resource.type}</p>
-                        </div>
-                    </a>
-                ))}
-            </div>
-        </div>
-    );
-};
-
 const AssignmentsSection: React.FC<{ assignments: Assignment[] }> = ({ assignments }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-blue-500">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <h3 className="text-xl font-bold flex items-center mb-4"><ClipboardListIcon className="h-6 w-6 mr-3 text-blue-500" />Asignaciones</h3>
         {assignments.length > 0 ? (
             <ul className="space-y-3">
@@ -98,7 +56,7 @@ const AssignmentsSection: React.FC<{ assignments: Assignment[] }> = ({ assignmen
 );
 
 const ExamsSection: React.FC<{ exams: Exam[] }> = ({ exams }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-red-500">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <h3 className="text-xl font-bold flex items-center mb-4"><AcademicCapIcon className="h-6 w-6 mr-3 text-red-500" />Exámenes</h3>
         {exams.length > 0 ? (
             <ul className="space-y-3">
@@ -121,7 +79,7 @@ const ExamsSection: React.FC<{ exams: Exam[] }> = ({ exams }) => (
 );
 
 const GradesSection: React.FC<{ grades: Grade[] }> = ({ grades }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-green-500">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
         <h3 className="text-xl font-bold flex items-center mb-4"><ChartBarIcon className="h-6 w-6 mr-3 text-green-500" />Mis Notas del Curso</h3>
         {grades.length > 0 ? (
             <div className="overflow-x-auto">
@@ -150,51 +108,39 @@ const GradesSection: React.FC<{ grades: Grade[] }> = ({ grades }) => (
     </div>
 );
 
-const CourseDetail: React.FC<CourseDetailProps> = ({ course, user, onBack, allAssignments, allExams, allGrades, allResources }) => {
+
+const CourseDetail: React.FC<CourseDetailProps> = ({ course, user, onBack, allAssignments, allExams, allGrades }) => {
     const courseAssignments = allAssignments.filter(a => a.courseId === course.id);
     const courseExams = allExams.filter(e => e.courseId === course.id);
+    // Filter grades strictly by course ID (Student name filtering happens in the Hook now)
     const courseGrades = allGrades.filter(g => g.courseId === course.id);
-    const courseResources = allResources.filter(r => r.courseId === course.id);
 
     return (
-        <div className="space-y-8 animate-fade-in pb-12">
+        <div>
             <button
                 onClick={onBack}
-                className="flex items-center text-blue-600 dark:text-blue-400 hover:underline font-black uppercase text-[10px] tracking-widest"
+                className="flex items-center text-blue-600 dark:text-blue-400 hover:underline mb-6 font-semibold"
                 aria-label="Volver a la lista de cursos"
             >
                 <ChevronLeftIcon className="h-5 w-5 mr-2" />
                 Volver a Cursos
             </button>
 
-            <div className="bg-white dark:bg-gray-800 p-10 rounded-[2.5rem] shadow-xl border-t-8 border-blue-500">
-                <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter">{course.title}</h1>
-                <p className="text-gray-400 font-bold mt-1 text-sm tracking-widest uppercase">{course.id}</p>
-                <div className="mt-8 flex items-center bg-blue-50 dark:bg-blue-900/20 p-4 rounded-3xl w-fit border border-blue-100 dark:border-blue-800">
-                    <div className="h-10 w-10 rounded-2xl bg-blue-500 flex items-center justify-center text-white font-black text-xl mr-4 shadow-lg">
-                        {course.professor.charAt(0)}
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Profesor Titular</p>
-                        <p className="text-lg font-bold text-gray-800 dark:text-gray-200 leading-none">{course.professor}</p>
-                    </div>
-                </div>
-                <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border-2 border-dashed border-gray-100 dark:border-gray-800 italic text-gray-600 dark:text-gray-400">
-                    "{course.description}"
-                </div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-8">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{course.title}</h1>
+                <p className="text-gray-500 dark:text-gray-400 mt-1">{course.id}</p>
+                <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">Profesor: <span className="font-semibold">{course.professor}</span></p>
+                <p className="mt-4 text-gray-600 dark:text-gray-400 border-l-4 border-blue-500 pl-4 italic">{course.description}</p>
             </div>
 
-            {/* SECCIÓN RECURSOS (VISIBILIDAD INTELIGENTE) */}
-            <ResourcesSection resources={courseResources} />
-
-            {/* CONTENIDO DETALLADO */}
+            {/* SECCIÓN NUEVA: CONTENIDO DETALLADO */}
             {course.detailedContent && (
-                <div className="bg-white dark:bg-gray-800 p-10 rounded-[2.5rem] shadow-xl">
-                    <h3 className="text-xl font-black flex items-center mb-6 text-gray-900 dark:text-white uppercase text-xs tracking-widest">
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-8">
+                    <h3 className="text-xl font-bold flex items-center mb-4 text-gray-900 dark:text-white">
                         <BookOpenIcon className="h-6 w-6 mr-3 text-purple-500" />
-                        Guía de la Materia
+                        Sobre este Curso
                     </h3>
-                    <div className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed font-medium">
+                    <div className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
                         {course.detailedContent}
                     </div>
                 </div>
@@ -205,7 +151,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, user, onBack, allAs
                     <AssignmentsSection assignments={courseAssignments} />
                     <ExamsSection exams={courseExams} />
                 </div>
-                <div className="h-full">
+                <div>
                     <GradesSection grades={courseGrades} />
                 </div>
             </div>

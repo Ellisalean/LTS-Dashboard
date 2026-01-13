@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Course, CourseStatus, User, Assignment, Exam, Grade, Resource } from '../../types.ts';
+import { Course, CourseStatus, User, Assignment, Exam, Grade } from '../../types.ts';
 import { BookOpenIcon, SearchIcon } from '../Icons.tsx';
 import CourseDetail from './CourseDetail.tsx';
 
@@ -54,12 +54,11 @@ interface CoursesProps {
     assignments: Assignment[];
     exams: Exam[];
     grades: Grade[];
-    resources: Resource[];
     targetCourseId?: string | null;
     onClearTarget?: () => void;
 }
 
-const Courses: React.FC<CoursesProps> = ({ user, courses, assignments, exams, grades, resources, targetCourseId, onClearTarget }) => {
+const Courses: React.FC<CoursesProps> = ({ user, courses, assignments, exams, grades, targetCourseId, onClearTarget }) => {
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -88,7 +87,6 @@ const Courses: React.FC<CoursesProps> = ({ user, courses, assignments, exams, gr
             allAssignments={assignments}
             allExams={exams}
             allGrades={grades}
-            allResources={resources}
         />;
     }
 
