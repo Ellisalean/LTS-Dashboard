@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../application/supabase.ts';
-import { Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus, User, Payment } from '../types.ts';
+import { Course, Assignment, Exam, Grade, Message, CalendarEvent, CourseStatus, User, Payment, Resource } from '../types.ts';
 
 interface FinancialStatus {
     hasDebt: boolean;
@@ -14,6 +14,7 @@ interface DataState {
     assignments: Assignment[];
     exams: Exam[];
     grades: Grade[];
+    resources: Resource[];
     messages: Message[];
     calendarEvents: CalendarEvent[];
     loading: boolean;
@@ -27,6 +28,7 @@ export const useRealtimeData = (user: User | null) => {
         assignments: [],
         exams: [],
         grades: [],
+        resources: [],
         messages: [],
         calendarEvents: [],
         loading: true,
@@ -46,18 +48,27 @@ export const useRealtimeData = (user: User | null) => {
                 const userId = dbUser?.id;
                 if (!userId) return;
 
-                // 2. Obtener Inscripciones y Notas simultáneamente
-                const [inscRes, gradesRes, coursesRes, chatRes, paymentsRes] = await Promise.all([
+                // 2. Obtener Inscripciones, Notas, Recursos y otros datos
+                const [inscRes, gradesRes, coursesRes, chatRes, paymentsRes, resourcesRes] = await Promise.all([
                     supabase.from('inscripciones').select('curso_id').eq('estudiante_id', userId),
                     supabase.from('notas').select('*').eq('estudiante_id', userId),
                     supabase.from('cursos').select('*').order('nombre'),
                     supabase.from('chat_mensajes').select('*', { count: 'exact', head: true }).eq('receiver_id', userId).eq('leido', false),
-                    supabase.from('pagos').select('*').eq('student_id', userId)
+                    supabase.from('pagos').select('*').eq('student_id', userId),
+                    supabase.from('recursos').select('*').order('created_at', { ascending: true })
                 ]);
 
                 const activeCourseIds = new Set((inscRes.data || []).map(i => i.curso_id));
                 const dbGrades = gradesRes.data || [];
                 const dbCourses = coursesRes.data || [];
+                const dbResources = (resourcesRes.data || []).map((r: any) => ({
+                    id: r.id,
+                    courseId: r.course_id,
+                    title: r.titulo,
+                    url: r.url,
+                    type: r.tipo,
+                    createdAt: r.created_at
+                }));
                 
                 const courseMap = dbCourses.reduce((acc: any, c: any) => {
                     acc[c.id] = c.nombre;
@@ -70,11 +81,10 @@ export const useRealtimeData = (user: User | null) => {
                     return acc;
                 }, {});
 
-                // 3. Lógica mejorada de estados
+                // 3. Lógica de estados de cursos
                 const courses: Course[] = dbCourses.map((c: any) => {
                     let computedStatus = CourseStatus.NoIniciado;
                     
-                    // Prioridad 1: ¿Tiene nota final? -> Completado
                     const hasFinal = (gradesByCourse[c.id] || []).some((g: any) => 
                         (g.titulo_asignacion || '').toLowerCase().includes('final')
                     );
@@ -82,7 +92,6 @@ export const useRealtimeData = (user: User | null) => {
                     if (hasFinal) {
                         computedStatus = CourseStatus.Completado;
                     } else if (activeCourseIds.has(c.id)) {
-                        // Prioridad 2: ¿Está inscrito actualmente? -> En Curso
                         computedStatus = CourseStatus.EnCurso;
                     }
 
@@ -98,13 +107,12 @@ export const useRealtimeData = (user: User | null) => {
                     };
                 });
 
-                // Ordenar cursos: Activos primero, luego completados, luego el resto
                 courses.sort((a, b) => {
                     const order = { [CourseStatus.EnCurso]: 1, [CourseStatus.Completado]: 2, [CourseStatus.NoIniciado]: 3 };
                     return order[a.status] - order[b.status];
                 });
 
-                // 4. Asignaciones y Exámenes (Solo de materias EN CURSO)
+                // 4. Asignaciones y Exámenes
                 const activeIdsArray = Array.from(activeCourseIds);
                 let assignments: Assignment[] = [];
                 let exams: Exam[] = [];
@@ -144,11 +152,12 @@ export const useRealtimeData = (user: User | null) => {
                         courses,
                         assignments,
                         exams,
+                        resources: dbResources,
                         grades: dbGrades.map((g: any) => ({
                             id: g.id, courseId: g.curso_id, course: courseMap[g.curso_id] || g.curso_id,
                             assignmentTitle: g.titulo_asignacion, score: g.puntuacion, maxScore: g.puntuacion_maxima, studentName: user.name
                         })),
-                        messages: [], // Fetch messages separately if needed
+                        messages: [],
                         calendarEvents: [],
                         loading: false,
                         unreadChatCount: chatRes.count || 0,
