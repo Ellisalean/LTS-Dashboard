@@ -56,7 +56,6 @@ const getImageData = (url: string): Promise<string> => {
 };
 
 const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
-    const isSuperAdmin = user.role === 'admin';
     const isTeacher = user.role === 'profesor';
 
     const [activeTab, setActiveTab] = useState<'students' | 'assignments' | 'exams' | 'attendance' | 'announcements' | 'courses' | 'resources'>('students');
@@ -67,9 +66,8 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
     const [studentSearchTerm, setStudentSearchTerm] = useState('');
     const [adminCourses, setAdminCourses] = useState<CourseAdminData[]>([]);
-    const [editingCourse, setEditingCourse] = useState<CourseAdminData | null>(null);
-
-    // Estados de edición de alumno
+    
+    // Estados Alumno
     const [editName, setEditName] = useState('');
     const [editEmail, setEditEmail] = useState('');
     const [editPassword, setEditPassword] = useState('');
@@ -77,25 +75,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [studentInscriptions, setStudentInscriptions] = useState<string[]>([]);
     const [studentPayments, setStudentPayments] = useState<Payment[]>([]);
 
-    // Estados para gestión de tareas/exámenes/asistencia
-    const [assignments, setAssignments] = useState<any[]>([]);
-    const [newAssignCourse, setNewAssignCourse] = useState('');
-    const [newAssignTitle, setNewAssignTitle] = useState('');
-    const [newAssignDate, setNewAssignDate] = useState('');
-
-    const [exams, setExams] = useState<any[]>([]);
-    const [newExamCourse, setNewExamCourse] = useState('');
-    const [newExamTitle, setNewExamTitle] = useState('');
-    const [newExamDate, setNewExamDate] = useState('');
-
-    const [announcements, setAnnouncements] = useState<any[]>([]);
-    const [newAnnounceMsg, setNewAnnounceMsg] = useState('');
-
-    const [attendanceCourse, setAttendanceCourse] = useState('');
-    const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
-    const [attendanceMap, setAttendanceMap] = useState<Record<string, string>>({});
-
-    // Estados para Recursos
+    // Estados Recursos
     const [courseResources, setCourseResources] = useState<Resource[]>([]);
     const [newResCourse, setNewResCourse] = useState('');
     const [newResTitle, setNewResTitle] = useState('');
@@ -103,7 +83,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [newResType, setNewResType] = useState<'pdf' | 'video' | 'audio' | 'link'>('pdf');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-    // Estados para Notas y Pagos
+    // Estados Auxiliares
     const [newGradeCourse, setNewGradeCourse] = useState('');
     const [newGradeTitle, setNewGradeTitle] = useState('Nota Final');
     const [newGradeScore, setNewGradeScore] = useState(0);
@@ -157,23 +137,22 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         setStudentPayments(data || []);
     };
 
-    const handleAddPayment = async () => {
-        if (!selectedStudent || newPayAmount <= 0) return;
-        const { error } = await supabase.from('pagos').insert({
-            student_id: selectedStudent.id, amount: newPayAmount, description: newPayDesc || 'Mensualidad', method: newPayMethod, date: new Date().toISOString().split('T')[0], verified: true, type: 'tuition'
-        });
-        if (!error) { fetchStudentPayments(selectedStudent.id); setNewPayAmount(0); setNewPayDesc(''); }
-    };
-
-    const handleDeletePayment = async (id: string) => {
-        if (!confirm('¿Eliminar este registro de pago?')) return;
-        await supabase.from('pagos').delete().eq('id', id);
-        if (selectedStudent) fetchStudentPayments(selectedStudent.id);
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setSelectedFile(file);
+            const mime = file.type;
+            if (mime.includes('pdf')) setNewResType('pdf');
+            else if (mime.includes('video')) setNewResType('video');
+            else if (mime.includes('audio')) setNewResType('audio');
+            else setNewResType('link');
+            if (!newResTitle) setNewResTitle(file.name.split('.')[0]);
+        }
     };
 
     const handleAddResource = async () => {
         if (!newResCourse || !newResTitle) {
-            alert("Por favor selecciona una materia y un título.");
+            alert("Completa la materia y el título.");
             return;
         }
 
@@ -182,22 +161,19 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
 
         try {
             if (selectedFile) {
-                const fileExt = selectedFile.name.split('.').pop();
-                const fileName = `${newResCourse}_${Date.now()}.${fileExt}`;
-                const filePath = `${fileName}`; // Sin prefijo de carpeta si el bucket es directo
-
-                const { data: uploadData, error: uploadError } = await supabase.storage
+                const fileName = `${newResCourse}_${Date.now()}_${selectedFile.name.replace(/\s/g, '_')}`;
+                const { error: uploadError } = await supabase.storage
                     .from('recursos')
-                    .upload(filePath, selectedFile, { upsert: true });
+                    .upload(fileName, selectedFile);
 
                 if (uploadError) throw uploadError;
 
-                const { data: { publicUrl } } = supabase.storage.from('recursos').getPublicUrl(filePath);
+                const { data: { publicUrl } } = supabase.storage.from('recursos').getPublicUrl(fileName);
                 finalUrl = publicUrl;
             }
 
             if (!finalUrl) {
-                alert("Debes proporcionar un link o subir un archivo.");
+                alert("Debes subir un archivo o pegar un link.");
                 setIsSaving(false);
                 return;
             }
@@ -217,84 +193,45 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             setSelectedFile(null);
             fetchResources();
         } catch (err: any) {
-            console.error("Error completo:", err);
-            alert("Error al procesar: " + (err.message || "Error desconocido"));
+            console.error("Error al guardar material:", err);
+            alert("Error: " + (err.message || "No se pudo guardar"));
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setSelectedFile(file);
-            // Detección automática del tipo
-            const mime = file.type;
-            if (mime.includes('pdf')) setNewResType('pdf');
-            else if (mime.includes('video')) setNewResType('video');
-            else if (mime.includes('audio')) setNewResType('audio');
-            else setNewResType('link');
-            
-            if (!newResTitle) setNewResTitle(file.name.split('.')[0]);
-        }
-    };
-
     const handleDeleteResource = async (resource: Resource) => {
         if (!confirm('¿Eliminar este material?')) return;
-        
         if (resource.url.includes('storage.v1/object/public/recursos')) {
             const fileName = resource.url.split('/').pop();
             if (fileName) await supabase.storage.from('recursos').remove([fileName]);
         }
-
         await supabase.from('recursos').delete().eq('id', resource.id);
         fetchResources();
     };
 
-    // Efectos para pestañas secundarias
     useEffect(() => {
-        if (activeTab === 'assignments') fetchAssignments();
-        if (activeTab === 'exams') fetchExams();
-        if (activeTab === 'announcements') fetchAnnouncements();
         if (activeTab === 'resources') fetchResources();
     }, [activeTab]);
 
-    const fetchAssignments = async () => {
-        const { data } = await supabase.from('asignaciones').select('*').order('fecha_entrega', { ascending: false });
-        setAssignments(data || []);
-    };
-
-    const fetchExams = async () => {
-        const { data } = await supabase.from('examenes').select('*').order('fecha', { ascending: false });
-        setExams(data || []);
-    };
-
-    const fetchAnnouncements = async () => {
-        const { data } = await supabase.from('mensajes').select('*').order('fecha_envio', { ascending: false });
-        setAnnouncements(data || []);
-    };
-
-    if (loading) return <div className="p-10 text-center flex flex-col items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-        <p className="text-gray-500 font-bold uppercase text-xs tracking-widest text-blue-600 animate-pulse">Sincronizando LTS...</p>
-    </div>;
+    if (loading) return (
+        <div className="p-10 text-center flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-blue-600 font-black uppercase text-xs tracking-widest">Cargando Panel Administrativo...</p>
+        </div>
+    );
 
     return (
         <div className="space-y-6 pb-20 max-w-[1600px] mx-auto px-4">
             <h1 className="text-3xl font-black flex items-center text-gray-800 dark:text-white tracking-tighter">
                 <UserGroupIcon className="h-9 w-9 mr-4 text-blue-600"/>
-                Gestión Administrativa
+                Gestión LTS
             </h1>
             
             <div className="flex space-x-1 bg-gray-200 dark:bg-gray-700/50 p-1.5 rounded-3xl overflow-x-auto shadow-inner border border-gray-100 dark:border-gray-700">
                 {[
                     { id: 'students', label: 'Alumnos', icon: UserGroupIcon },
-                    { id: 'courses', label: 'Materias', icon: BookOpenIcon },
                     { id: 'resources', label: 'Materiales', icon: LinkIcon },
-                    { id: 'assignments', label: 'Tareas', icon: ClipboardListIcon },
-                    { id: 'exams', label: 'Exámenes', icon: AcademicCapIcon },
-                    { id: 'attendance', label: 'Asistencia', icon: CheckIcon },
-                    { id: 'announcements', label: 'Anuncios', icon: MailIcon },
                 ].map(tab => (
                     <button 
                         key={tab.id} 
@@ -306,13 +243,12 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 ))}
             </div>
 
-            {/* VISTA DE RECURSOS */}
             {activeTab === 'resources' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-indigo-500 h-fit space-y-6">
                         <h3 className="font-black flex items-center text-gray-700 dark:text-gray-200 uppercase text-xs tracking-widest">
                             <PlusIcon className="w-6 h-6 mr-3 text-indigo-600"/>
-                            Publicar Nuevo Material
+                            Publicar Material Directo
                         </h3>
                         
                         <div className="space-y-4">
@@ -321,7 +257,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 <select 
                                     value={newResCourse} 
                                     onChange={e => setNewResCourse(e.target.value)} 
-                                    className="w-full p-4 text-xs border border-gray-100 dark:border-gray-700 rounded-2xl dark:bg-gray-700 font-black uppercase"
+                                    className="w-full p-4 text-xs border border-gray-100 dark:border-gray-700 rounded-2xl dark:bg-gray-700 font-black uppercase shadow-sm"
                                 >
                                     <option value="">Seleccionar Materia...</option>
                                     {adminCourses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -329,49 +265,33 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Título</label>
+                                <label className="text-[10px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Título descriptivo</label>
                                 <input 
                                     type="text" 
                                     value={newResTitle} 
                                     onChange={e => setNewResTitle(e.target.value)} 
-                                    placeholder="Ej: Lectura de la Semana" 
-                                    className="w-full p-4 text-xs border border-gray-100 rounded-2xl dark:bg-gray-700 font-bold shadow-sm"
+                                    placeholder="Ej: Clase 01 - El Pentateuco" 
+                                    className="w-full p-4 text-xs border border-gray-100 rounded-2xl dark:bg-gray-700 font-bold"
                                 />
                             </div>
 
-                            <div className="grid grid-cols-4 gap-2">
-                                {(['pdf', 'video', 'audio', 'link'] as const).map(type => (
-                                    <button 
-                                        key={type} 
-                                        onClick={() => setNewResType(type)} 
-                                        className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${newResType === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                                    >
-                                        {type}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-indigo-400 transition-colors">
+                            <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-indigo-400 transition-all">
                                 <label className="flex flex-col items-center justify-center cursor-pointer">
                                     <DownloadIcon className="w-8 h-8 text-indigo-400 mb-2"/>
-                                    <span className="text-[10px] font-black text-gray-500 uppercase text-center">
-                                        {selectedFile ? selectedFile.name : "Subir archivo (PDF, MP4, MP3)"}
+                                    <span className="text-[10px] font-black text-gray-500 uppercase text-center px-4">
+                                        {selectedFile ? selectedFile.name : "Subir PDF, Video o Audio"}
                                     </span>
-                                    <input 
-                                        type="file" 
-                                        className="hidden" 
-                                        onChange={handleFileChange}
-                                    />
+                                    <input type="file" className="hidden" onChange={handleFileChange}/>
                                 </label>
                             </div>
 
                             <div className="text-center">
-                                <span className="text-[10px] text-gray-400 font-bold uppercase">ó pega un enlace</span>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">o enlace externo</span>
                                 <input 
                                     type="text" 
                                     value={newResUrl} 
                                     onChange={e => setNewResUrl(e.target.value)} 
-                                    placeholder="https://youtube.com/..." 
+                                    placeholder="https://drive.google.com/..." 
                                     className="w-full mt-2 p-3 text-xs border border-gray-100 rounded-2xl dark:bg-gray-700 font-medium italic"
                                 />
                             </div>
@@ -379,16 +299,16 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             <button 
                                 onClick={handleAddResource} 
                                 disabled={isSaving}
-                                className={`w-full font-black py-4 rounded-2xl text-[10px] uppercase shadow-2xl tracking-widest transition-all ${isSaving ? 'bg-gray-400 scale-95' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}
+                                className={`w-full font-black py-4 rounded-2xl text-[10px] uppercase shadow-2xl tracking-widest transition-all ${isSaving ? 'bg-gray-400 animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}
                             >
-                                {isSaving ? 'Subiendo...' : 'Publicar Material'}
+                                {isSaving ? 'Subiendo Archivo...' : 'Publicar Material'}
                             </button>
                         </div>
                     </div>
 
                     <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border dark:border-gray-700">
                         <div className="p-6 bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700 font-black text-[10px] uppercase tracking-widest text-gray-400 flex justify-between items-center">
-                            <span>Materiales Publicados</span>
+                            <span>Historial de Recursos</span>
                             <span className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full">{courseResources.length}</span>
                         </div>
                         <div className="divide-y dark:divide-gray-700 overflow-y-auto max-h-[600px]">
@@ -398,8 +318,8 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                         <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl mr-4 group-hover:scale-110 transition-transform">
                                             {res.type === 'video' ? <VideoIcon className="w-5 h-5 text-red-500" /> : res.type === 'pdf' ? <DocumentTextIcon className="w-5 h-5 text-blue-500" /> : res.type === 'audio' ? <MusicIcon className="w-5 h-5 text-purple-500" /> : <LinkIcon className="w-5 h-5 text-gray-500" />}
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-gray-800 dark:text-white">{res.title}</p>
+                                        <div className="overflow-hidden">
+                                            <p className="text-sm font-bold text-gray-800 dark:text-white truncate max-w-[150px]">{res.title}</p>
                                             <p className="text-[10px] text-indigo-500 font-black uppercase">
                                                 {(adminCourses.find(c => c.id === res.courseId)?.nombre || res.courseId)}
                                             </p>
@@ -411,17 +331,13 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                     </div>
                                 </div>
                             ))}
-                            {courseResources.length === 0 && (
-                                <div className="p-10 text-center text-gray-400 italic text-sm">No se han publicado materiales aún.</div>
-                            )}
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* TABLA DE ALUMNOS (SE MANTIENE IGUAL) */}
-            {activeTab === 'students' && !selectedStudent && (
-                 <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-700 animate-fade-in">
+            {activeTab === 'students' && (
+                <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-700 animate-fade-in">
                     <div className="p-6 border-b dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20">
                         <div className="relative w-full max-w-lg">
                             <input 
@@ -429,14 +345,14 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 placeholder="Buscar alumno..." 
                                 value={studentSearchTerm} 
                                 onChange={(e) => setStudentSearchTerm(e.target.value)} 
-                                className="w-full pl-12 pr-4 py-4 rounded-2xl border-none bg-white dark:bg-gray-700 shadow-lg text-sm focus:ring-2 focus:ring-blue-500" 
+                                className="w-full pl-12 pr-4 py-4 rounded-2xl border-none bg-white dark:bg-gray-700 shadow-lg text-sm focus:ring-2 focus:ring-blue-500 transition-all" 
                             />
                             <SearchIcon className="w-6 h-6 absolute left-4 top-3.5 text-blue-500"/>
                         </div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead><tr className="bg-gray-50 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-8 py-5">Nombre</th><th className="px-8 py-5">Rol</th><th className="px-8 py-5 text-right"></th></tr></thead>
+                            <thead><tr className="bg-gray-50 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-8 py-5">Nombre del Alumno</th><th className="px-8 py-5">Rol</th><th className="px-8 py-5 text-right">Acciones</th></tr></thead>
                             <tbody className="divide-y dark:divide-gray-700">
                                 {students.filter(s => s.nombre.toLowerCase().includes(studentSearchTerm.toLowerCase())).map(s => (
                                     <tr key={s.id} className="hover:bg-blue-50/30 dark:hover:bg-gray-700/30 transition-colors">
@@ -446,7 +362,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                         </td>
                                         <td className="px-8 py-5 text-xs text-blue-500 font-black uppercase">{s.rol}</td>
                                         <td className="px-8 py-5 text-right">
-                                            <button onClick={() => handleSelectStudent(s)} className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 shadow-xl tracking-widest transition-all">Gestionar</button>
+                                            <button onClick={() => handleSelectStudent(s)} className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 shadow-xl transition-all tracking-widest">Gestionar</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -455,8 +371,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                 </div>
             )}
-            
-            {/* El resto de las pestañas (tareas, exámenes, etc.) se renderizarían aquí basándose en activeTab */}
         </div>
     );
 };
