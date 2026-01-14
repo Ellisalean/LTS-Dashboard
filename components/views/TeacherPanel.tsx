@@ -335,7 +335,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             activo: editActivo 
         }).eq('id', selectedStudent.id);
         
-        // Actualizar lista local para que los cambios se vean al volver
         setStudents(prev => prev.map(s => s.id === selectedStudent.id ? { ...s, nombre: editName, email: editEmail, password: editPassword, activo: editActivo } : s));
         
         setIsSaving(false);
@@ -390,14 +389,31 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         const { data: existentes } = await supabase.from('asistencias').select('*').eq('curso_id', attCourse).eq('fecha', attDate);
         setAttList((inscritos || []).map((i: any) => ({
             id: i.estudiante_id, nombre: i.estudiantes.nombre, avatar: i.estudiantes.avatar_url,
-            estado: existentes?.find(e => e.estudiante_id === i.estudiante_id)?.estado || 'presente'
+            estado: existentes?.find(e => e.estudiante_id === i.estudiante_id)?.estado || 'ninguno'
         })));
     };
 
-    const toggleAttendance = async (studentId: string, currentStatus: string) => {
-        const nextStatus = currentStatus === 'presente' ? 'ausente' : 'presente';
-        const { error } = await supabase.from('asistencias').upsert({ estudiante_id: studentId, curso_id: attCourse, fecha: attDate, estado: nextStatus }, { onConflict: 'estudiante_id,curso_id,fecha' });
-        if (!error) setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
+    const cycleAttendance = async (studentId: string, currentStatus: string) => {
+        // Ciclo de estados: Ninguno -> Presente -> Ausente -> Ninguno (Elimina registro)
+        let nextStatus = 'presente';
+        if (currentStatus === 'presente') nextStatus = 'ausente';
+        else if (currentStatus === 'ausente') nextStatus = 'ninguno';
+
+        if (nextStatus === 'ninguno') {
+            const { error } = await supabase.from('asistencias').delete()
+                .eq('estudiante_id', studentId)
+                .eq('curso_id', attCourse)
+                .eq('fecha', attDate);
+            if (!error) setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: 'ninguno' } : a));
+        } else {
+            const { error } = await supabase.from('asistencias').upsert({ 
+                estudiante_id: studentId, 
+                curso_id: attCourse, 
+                fecha: attDate, 
+                estado: nextStatus 
+            }, { onConflict: 'estudiante_id,curso_id,fecha' });
+            if (!error) setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
+        }
     };
 
     const handleAddAssignment = async () => {
@@ -433,9 +449,15 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     };
 
     const handlePostAnnouncement = async () => {
-        if (!newItem.title) return;
+        if (!newItem.title || !newItem.content) return alert("Debes incluir asunto y contenido.");
         setIsSaving(true);
-        await supabase.from('mensajes').insert({ remitente: user.name, asunto: newItem.title, leido: false, fecha_envio: new Date().toISOString() });
+        await supabase.from('mensajes').insert({ 
+            remitente: user.name, 
+            asunto: newItem.title, 
+            contenido: newItem.content, // Aseguramos guardar el contenido
+            leido: false, 
+            fecha_envio: new Date().toISOString() 
+        });
         setNewItem({ courseId: '', title: '', date: '', time: '', content: '', type: 'pdf' });
         await fetchAnnouncements();
         setIsSaving(false);
@@ -636,49 +658,20 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 <h4 className="text-center font-black text-gray-800 text-lg leading-tight mt-2">{selectedStudent.nombre}</h4>
                                 <p className="text-[9px] font-black text-blue-600 uppercase tracking-[0.2em] mt-1">{selectedStudent.rol}</p>
                                 
-                                {/* SELECTOR DE ESTADO ELEGANTE */}
                                 <div className="w-full mt-6 p-1 bg-gray-100 dark:bg-gray-700 rounded-2xl flex relative h-12 shadow-inner">
-                                    <button 
-                                        onClick={() => setEditActivo(true)}
-                                        className={`flex-1 flex items-center justify-center text-[10px] font-black uppercase tracking-widest z-10 transition-colors ${editActivo ? 'text-white' : 'text-gray-400'}`}
-                                    >
-                                        Activo
-                                    </button>
-                                    <button 
-                                        onClick={() => setEditActivo(false)}
-                                        className={`flex-1 flex items-center justify-center text-[10px] font-black uppercase tracking-widest z-10 transition-colors ${!editActivo ? 'text-white' : 'text-gray-400'}`}
-                                    >
-                                        Inactivo
-                                    </button>
+                                    <button onClick={() => setEditActivo(true)} className={`flex-1 flex items-center justify-center text-[10px] font-black uppercase tracking-widest z-10 transition-colors ${editActivo ? 'text-white' : 'text-gray-400'}`}>Activo</button>
+                                    <button onClick={() => setEditActivo(false)} className={`flex-1 flex items-center justify-center text-[10px] font-black uppercase tracking-widest z-10 transition-colors ${!editActivo ? 'text-white' : 'text-gray-400'}`}>Inactivo</button>
                                     <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 shadow-lg ${editActivo ? 'left-1 bg-green-500' : 'left-[calc(50%+1px)] bg-red-500'}`}></div>
                                 </div>
 
                                 {hasFullAccess && (
-                                    <button 
-                                        onClick={handleSendCreds} 
-                                        disabled={isSaving}
-                                        className="w-full mt-4 bg-amber-500 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-amber-600 transition-all flex items-center justify-center tracking-widest"
-                                    >
-                                        <MailIcon className="w-5 h-5 mr-2"/> Enviar Credenciales
-                                    </button>
+                                    <button onClick={handleSendCreds} disabled={isSaving} className="w-full mt-4 bg-amber-500 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-amber-600 transition-all flex items-center justify-center tracking-widest"><MailIcon className="w-5 h-5 mr-2"/> Enviar Credenciales</button>
                                 )}
                             </div>
                             <div className="space-y-4">
-                                <div className="space-y-1">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase ml-2">Email de Acceso</label>
-                                    <input value={editEmail} onChange={e => setEditEmail(e.target.value)} disabled={!hasFullAccess} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 text-xs font-bold border-none shadow-inner outline-none focus:ring-1 focus:ring-blue-500"/>
-                                </div>
-                                {hasFullAccess && (
-                                    <div className="space-y-1">
-                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-2">Clave de Seguridad</label>
-                                        <input type="text" value={editPassword} onChange={e => setEditPassword(e.target.value)} placeholder="Contraseña" className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 text-xs font-bold border-none shadow-inner outline-none focus:ring-1 focus:ring-blue-500"/>
-                                    </div>
-                                )}
-                                {hasFullAccess && (
-                                    <button onClick={handleUpdateProfile} className="w-full bg-blue-600 text-white py-5 rounded-[1.5rem] font-black text-[10px] uppercase shadow-xl hover:bg-blue-700 transition-all transform active:scale-95">
-                                        Guardar Cambios
-                                    </button>
-                                )}
+                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2">Email de Acceso</label><input value={editEmail} onChange={e => setEditEmail(e.target.value)} disabled={!hasFullAccess} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 text-xs font-bold border-none shadow-inner outline-none focus:ring-1 focus:ring-blue-500"/></div>
+                                {hasFullAccess && <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2">Clave de Seguridad</label><input type="text" value={editPassword} onChange={e => setEditPassword(e.target.value)} placeholder="Contraseña" className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 text-xs font-bold border-none shadow-inner outline-none focus:ring-1 focus:ring-blue-500"/></div>}
+                                {hasFullAccess && <button onClick={handleUpdateProfile} className="w-full bg-blue-600 text-white py-5 rounded-[1.5rem] font-black text-[10px] uppercase shadow-xl hover:bg-blue-700 transition-all transform active:scale-95">Guardar Cambios</button>}
                             </div>
                         </div>
 
@@ -771,13 +764,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 </div>
                             )}
 
-                            <button 
-                                onClick={handlePostResource} 
-                                disabled={isSaving} 
-                                className={`w-full py-5 rounded-[2.5rem] font-black text-[11px] uppercase shadow-xl tracking-widest transition-all ${isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}
-                            >
-                                {isSaving ? 'Subiendo archivo, por favor espere...' : 'Publicar en Biblioteca'}
-                            </button>
+                            <button onClick={handlePostResource} disabled={isSaving} className={`w-full py-5 rounded-[2.5rem] font-black text-[11px] uppercase shadow-xl tracking-widest transition-all ${isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}>{isSaving ? 'Subiendo archivo, por favor espere...' : 'Publicar en Biblioteca'}</button>
                         </div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl overflow-hidden border h-[600px] flex flex-col"><div className="p-8 bg-gray-50 border-b flex justify-between items-center"><h3 className="font-black text-[11px] uppercase text-gray-400 tracking-widest">Biblioteca Digital LTS</h3><span className="bg-indigo-100 text-indigo-600 text-[9px] font-black px-4 py-1.5 rounded-full shadow-sm">{courseResources.length} Archivos Totales</span></div><div className="flex-1 overflow-y-auto divide-y">{courseResources.map(res => (<div key={res.id} className="p-6 flex items-center justify-between hover:bg-gray-100 transition-all"><div className="flex items-center truncate"><div className={`p-4 rounded-2xl mr-5 shadow-sm ${res.type === 'link' ? 'bg-indigo-50 text-indigo-500' : 'bg-blue-50 text-blue-500'}`}>{res.type === 'link' ? <LinkIcon className="w-6 h-6"/> : <DocumentTextIcon className="w-6 h-6"/>}</div><div className="truncate"><p className="text-sm font-black text-gray-800 truncate">{res.title}</p><p className="text-[9px] text-indigo-500 font-black uppercase tracking-widest mt-1">{(adminCourses.find(c => c.id === res.courseId)?.nombre || 'General')}</p></div></div><button onClick={() => handleDeleteItem('recursos', res.id)} className="text-gray-300 hover:text-red-500 p-2 transition-colors"><TrashIcon className="w-5 h-5"/></button></div>))}</div></div>
@@ -821,38 +808,9 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 <div className="space-y-1"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Oficial</label><input value={selectedCourse.nombre} onChange={e => setSelectedCourse({...selectedCourse, nombre: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold border-none shadow-inner outline-none focus:ring-2 focus:ring-blue-500 transition-all"/></div>
                                 <div className="space-y-1"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Profesor Asignado</label><input value={selectedCourse.profesor} onChange={e => setSelectedCourse({...selectedCourse, profesor: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold border-none shadow-inner outline-none focus:ring-2 focus:ring-blue-500 transition-all"/></div>
                                 <div className="space-y-1"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Créditos Académicos</label><input type="number" value={selectedCourse.creditos} onChange={e => setSelectedCourse({...selectedCourse, creditos: parseInt(e.target.value)})} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-bold border-none shadow-inner outline-none focus:ring-2 focus:ring-blue-500 transition-all"/></div>
-                                
-                                {/* RECUADRO CON MINIATURA PARA ENLACE DE FOTO */}
                                 <div className="space-y-2 pt-4 bg-blue-50/30 p-6 rounded-3xl border border-blue-100">
                                     <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">URL de Foto de Materia</label>
-                                    <div className="flex gap-4 items-start">
-                                        <div className="flex-1">
-                                            <input 
-                                                type="text"
-                                                placeholder="https://ejemplo.com/foto.jpg"
-                                                value={selectedCourse.image_url || ''} 
-                                                onChange={e => setSelectedCourse({...selectedCourse, image_url: e.target.value})} 
-                                                className="w-full p-4 rounded-2xl bg-white text-sm italic border-2 border-blue-100 shadow-sm focus:border-blue-500 outline-none transition-all"
-                                            />
-                                            <p className="text-[9px] text-gray-500 ml-1 italic mt-2 uppercase tracking-tight">Inserte el enlace directo a la imagen.</p>
-                                        </div>
-                                        {/* MINIATURA DE CONFIRMACIÓN */}
-                                        <div className="w-24 h-24 rounded-2xl bg-gray-200 overflow-hidden border-2 border-white shadow-lg flex-shrink-0 relative group">
-                                            {selectedCourse.image_url ? (
-                                                <img 
-                                                    src={selectedCourse.image_url} 
-                                                    alt="Vista previa" 
-                                                    className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                                                    onError={(e) => {
-                                                        e.currentTarget.src = 'https://via.placeholder.com/150?text=Error+Enlace';
-                                                        e.currentTarget.className = "w-full h-full object-contain opacity-50";
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-400 font-black uppercase text-center p-2">Sin Foto</div>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <div className="flex gap-4 items-start"><div className="flex-1"><input type="text" placeholder="https://ejemplo.com/foto.jpg" value={selectedCourse.image_url || ''} onChange={e => setSelectedCourse({...selectedCourse, image_url: e.target.value})} className="w-full p-4 rounded-2xl bg-white text-sm italic border-2 border-blue-100 shadow-sm focus:border-blue-500 outline-none transition-all"/><p className="text-[9px] text-gray-500 ml-1 italic mt-2 uppercase tracking-tight">Inserte el enlace directo a la imagen.</p></div><div className="w-24 h-24 rounded-2xl bg-gray-200 overflow-hidden border-2 border-white shadow-lg flex-shrink-0 relative group">{selectedCourse.image_url ? <img src={selectedCourse.image_url} alt="Vista previa" className="w-full h-full object-cover transition-transform group-hover:scale-110" onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/150?text=Error+Enlace'; e.currentTarget.className = "w-full h-full object-contain opacity-50"; }}/> : <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-400 font-black uppercase text-center p-2">Sin Foto</div>}</div></div>
                                 </div>
                             </div>
                             <div className="space-y-6">
@@ -884,7 +842,22 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             {activeTab === 'attendance' && (
                 <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl animate-fade-in border-t-8 border-green-500 space-y-8">
                     <div className="flex flex-col md:flex-row gap-6 items-end bg-gray-50 p-8 rounded-[2.5rem] shadow-inner border border-gray-100"><div className="flex-1 space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Materia para Pase de Lista</label><select value={attCourse} onChange={e => setAttCourse(e.target.value)} className="w-full p-4 rounded-2xl border-none text-sm font-black uppercase shadow-md outline-none focus:ring-2 focus:ring-green-500 transition-all"><option value="">Seleccionar Materia...</option>{adminCourses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></div><div className="w-full md:w-64 space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fecha de Clase</label><input type="date" value={attDate} onChange={e => setAttDate(e.target.value)} className="w-full p-4 rounded-2xl border-none text-sm font-black shadow-md outline-none"/></div><button onClick={loadAttendanceList} className="bg-green-600 text-white px-10 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-green-700 h-[56px] tracking-widest transition-all transform active:scale-95">Listar Grupo</button></div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">{attList.map(alumno => (<div key={alumno.id} onClick={() => toggleAttendance(alumno.id, alumno.estado)} className={`flex items-center justify-between p-6 rounded-[2rem] cursor-pointer transition-all border-2 shadow-sm transform hover:-translate-y-1 ${alumno.estado === 'presente' ? 'bg-green-50 border-green-200 shadow-green-100' : 'bg-red-50 border-red-200 shadow-red-100'}`}><div className="flex items-center"><img src={alumno.avatar} className="w-12 h-12 rounded-2xl mr-4 border-2 border-white shadow-md object-cover"/><p className="text-xs font-black text-gray-800 tracking-tight">{alumno.nombre}</p></div>{alumno.estado === 'presente' ? <CheckCircleIcon className="w-7 h-7 text-green-500"/> : <XIcon className="w-7 h-7 text-red-500"/>}</div>))}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">{attList.map(alumno => (
+                        <div 
+                            key={alumno.id} 
+                            onClick={() => cycleAttendance(alumno.id, alumno.estado)} 
+                            className={`flex items-center justify-between p-6 rounded-[2rem] cursor-pointer transition-all border-2 shadow-sm transform hover:-translate-y-1 ${alumno.estado === 'presente' ? 'bg-green-50 border-green-200 shadow-green-100' : alumno.estado === 'ausente' ? 'bg-red-50 border-red-200 shadow-red-100' : 'bg-gray-50 border-gray-100 shadow-inner'}`}
+                        >
+                            <div className="flex items-center">
+                                <img src={alumno.avatar} className="w-12 h-12 rounded-2xl mr-4 border-2 border-white shadow-md object-cover"/>
+                                <div>
+                                    <p className="text-xs font-black text-gray-800 tracking-tight">{alumno.nombre}</p>
+                                    <p className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${alumno.estado === 'ninguno' ? 'text-gray-400' : 'text-blue-500'}`}>{alumno.estado === 'ninguno' ? 'Sin Marcar' : alumno.estado}</p>
+                                </div>
+                            </div>
+                            {alumno.estado === 'presente' ? <CheckCircleIcon className="w-7 h-7 text-green-500"/> : alumno.estado === 'ausente' ? <XIcon className="w-7 h-7 text-red-500"/> : <div className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300"></div>}
+                        </div>
+                    ))}</div>
                 </div>
             )}
 
@@ -892,7 +865,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-indigo-500 h-fit space-y-6">
                         <h3 className="font-black flex items-center text-gray-700 uppercase text-xs tracking-widest"><PlusIcon className="w-6 h-6 mr-3 text-indigo-600"/> Redactar Anuncio</h3>
-                        <div className="space-y-4"><input type="text" value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} placeholder="Asunto del Mensaje" className="w-full p-5 text-xs bg-gray-50 border-none rounded-3xl font-black shadow-inner outline-none"/><textarea rows={5} value={newItem.content} onChange={e => setNewItem({...newItem, content: e.target.value})} placeholder="Contenido del anuncio público..." className="w-full p-5 text-xs bg-gray-50 border-none rounded-3xl font-medium shadow-inner outline-none"></textarea><button onClick={handlePostAnnouncement} className="w-full bg-indigo-600 text-white py-5 rounded-[2.5rem] font-black text-[11px] uppercase shadow-xl hover:bg-indigo-700 flex items-center justify-center tracking-widest transition-all"><SendIcon className="w-5 h-5 mr-3"/> Publicar en Tablón</button></div>
+                        <div className="space-y-4"><input type="text" value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} placeholder="Asunto del Mensaje" className="w-full p-5 text-xs bg-gray-50 border-none rounded-3xl font-black shadow-inner outline-none"/><textarea rows={5} value={newItem.content} onChange={e => setNewItem({...newItem, content: e.target.value})} placeholder="Escribe aquí el contenido detallado del anuncio para los alumnos..." className="w-full p-5 text-xs bg-gray-50 border-none rounded-3xl font-medium shadow-inner outline-none"></textarea><button onClick={handlePostAnnouncement} className="w-full bg-indigo-600 text-white py-5 rounded-[2.5rem] font-black text-[11px] uppercase shadow-xl hover:bg-indigo-700 flex items-center justify-center tracking-widest transition-all"><SendIcon className="w-5 h-5 mr-3"/> Publicar en Tablón</button></div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border h-[600px] flex flex-col"><div className="p-8 bg-gray-50 border-b font-black text-[10px] uppercase text-gray-400 tracking-widest">Anuncios Enviados</div><div className="flex-1 overflow-y-auto divide-y">{allAnnouncements.map(msg => (<div key={msg.id} className="p-6 hover:bg-gray-50 transition-all flex justify-between items-start group"><div className="truncate"><p className="text-sm font-black text-gray-800">{msg.asunto}</p><p className="text-[9px] font-black text-indigo-500 uppercase mt-2 flex items-center"><ClockIcon className="w-3.5 h-3.5 mr-1.5"/> {new Date(msg.fecha_envio).toLocaleDateString()} - {new Date(msg.fecha_envio).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p></div><button onClick={() => handleDeleteItem('mensajes', msg.id)} className="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-all"><TrashIcon className="w-5 h-5"/></button></div>))}</div></div>
                 </div>

@@ -71,7 +71,6 @@ export const useRealtimeData = (user: User | null) => {
 
                 const processedCourses = dbCourses.map((c: any) => {
                     const courseGrades = dbGrades.filter(g => g.curso_id === c.id);
-                    // Lógica: Si tiene una nota que diga "final" o "aprobada", está completado
                     const isCompleted = courseGrades.some(g => 
                         (g.titulo_asignacion || '').toLowerCase().includes('final') || 
                         (g.titulo_asignacion || '').toLowerCase().includes('examen final')
@@ -89,7 +88,29 @@ export const useRealtimeData = (user: User | null) => {
                     };
                 });
 
-                // Finanzas simplificadas para el Hook (la vista FinancialView tiene el cálculo detallado)
+                // --- GENERAR EVENTOS DE CALENDARIO REALES ---
+                const today = new Date();
+                today.setHours(0,0,0,0);
+
+                const events: CalendarEvent[] = [
+                    ...(assignmentsRes.data || [])
+                        .filter(a => activeCourseIds.has(a.curso_id) && new Date(a.fecha_entrega) >= today)
+                        .map(a => ({
+                            id: `asig-${a.id}`,
+                            title: `Tarea: ${a.titulo}`,
+                            date: a.fecha_entrega,
+                            type: 'assignment' as const
+                        })),
+                    ...(examsRes.data || [])
+                        .filter(e => activeCourseIds.has(e.curso_id) && new Date(e.fecha) >= today)
+                        .map(e => ({
+                            id: `exam-${e.id}`,
+                            title: `Examen: ${e.titulo}`,
+                            date: e.fecha,
+                            type: 'exam' as const
+                        }))
+                ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 5);
+
                 const totalPaid = (paymentsRes.data || []).reduce((acc: number, p: any) => acc + p.amount, 0);
                 const debt = Math.max(0, 150 - totalPaid);
 
@@ -107,9 +128,14 @@ export const useRealtimeData = (user: User | null) => {
                             id: g.id, courseId: g.curso_id, course: courseMap[g.curso_id], assignmentTitle: g.titulo_asignacion, score: g.puntuacion, maxScore: g.puntuacion_maxima
                         })),
                         messages: (messagesRes.data || []).map(m => ({
-                            id: m.id, from: m.remitente, subject: m.asunto, isRead: m.leido, timestamp: m.fecha_envio
+                            id: m.id, 
+                            from: m.remitente, 
+                            subject: m.asunto, 
+                            isRead: m.leido, 
+                            timestamp: m.fecha_envio,
+                            contenido: m.contenido // Aseguramos que el contenido viaje al frontend
                         })),
-                        calendarEvents: [],
+                        calendarEvents: events,
                         loading: false,
                         unreadChatCount: chatRes.count || 0,
                         financialStatus: { hasDebt: debt > 0, totalDebt: debt, monthsBehind: Math.floor(debt / 25) }
