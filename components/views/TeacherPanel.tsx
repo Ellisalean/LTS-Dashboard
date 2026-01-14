@@ -89,6 +89,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [attCourse, setAttCourse] = useState('');
     const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
     const [attList, setAttList] = useState<any[]>([]);
+    const [attLoading, setAttLoading] = useState(false);
 
     useEffect(() => {
         fetchInitialData();
@@ -384,35 +385,63 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     };
 
     const loadAttendanceList = async () => {
-        if (!attCourse) return;
-        const { data: inscritos } = await supabase.from('inscripciones').select('estudiante_id, estudiantes(nombre, avatar_url)').eq('curso_id', attCourse);
-        const { data: existentes } = await supabase.from('asistencias').select('*').eq('curso_id', attCourse).eq('fecha', attDate);
-        setAttList((inscritos || []).map((i: any) => ({
-            id: i.estudiante_id, nombre: i.estudiantes.nombre, avatar: i.estudiantes.avatar_url,
-            estado: existentes?.find(e => e.estudiante_id === i.estudiante_id)?.estado || 'ninguno'
-        })));
+        if (!attCourse) return alert("Por favor seleccione una materia.");
+        setAttLoading(true);
+        try {
+            // 1. Obtener inscritos
+            const { data: inscritos } = await supabase
+                .from('inscripciones')
+                .select('estudiante_id, estudiantes(nombre, avatar_url, activo)')
+                .eq('curso_id', attCourse);
+            
+            // 2. Obtener existencias para la fecha
+            const { data: existentes } = await supabase
+                .from('asistencias')
+                .select('*')
+                .eq('curso_id', attCourse)
+                .eq('fecha', attDate);
+
+            const mapped = (inscritos || [])
+                .filter((i: any) => i.estudiantes.activo !== false) // Solo activos
+                .map((i: any) => ({
+                    id: i.estudiante_id, 
+                    nombre: i.estudiantes.nombre, 
+                    avatar: i.estudiantes.avatar_url,
+                    estado: existentes?.find(e => e.estudiante_id === i.estudiante_id)?.estado || 'ninguno'
+                }));
+            
+            setAttList(mapped);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setAttLoading(false);
+        }
     };
 
     const cycleAttendance = async (studentId: string, currentStatus: string) => {
-        // Ciclo de estados: Ninguno -> Presente -> Ausente -> Ninguno (Elimina registro)
+        // Ciclo: ninguno -> presente -> ausente -> ninguno
         let nextStatus = 'presente';
         if (currentStatus === 'presente') nextStatus = 'ausente';
         else if (currentStatus === 'ausente') nextStatus = 'ninguno';
 
-        if (nextStatus === 'ninguno') {
-            const { error } = await supabase.from('asistencias').delete()
-                .eq('estudiante_id', studentId)
-                .eq('curso_id', attCourse)
-                .eq('fecha', attDate);
-            if (!error) setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: 'ninguno' } : a));
-        } else {
-            const { error } = await supabase.from('asistencias').upsert({ 
-                estudiante_id: studentId, 
-                curso_id: attCourse, 
-                fecha: attDate, 
-                estado: nextStatus 
-            }, { onConflict: 'estudiante_id,curso_id,fecha' });
-            if (!error) setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
+        try {
+            if (nextStatus === 'ninguno') {
+                const { error } = await supabase.from('asistencias').delete()
+                    .eq('estudiante_id', studentId)
+                    .eq('curso_id', attCourse)
+                    .eq('fecha', attDate);
+                if (!error) setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: 'ninguno' } : a));
+            } else {
+                const { error } = await supabase.from('asistencias').upsert({ 
+                    estudiante_id: studentId, 
+                    curso_id: attCourse, 
+                    fecha: attDate, 
+                    estado: nextStatus 
+                }, { onConflict: 'estudiante_id,curso_id,fecha' });
+                if (!error) setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
+            }
+        } catch (e) {
+            console.error("Error toggling attendance:", e);
         }
     };
 
@@ -451,15 +480,21 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const handlePostAnnouncement = async () => {
         if (!newItem.title || !newItem.content) return alert("Debes incluir asunto y contenido.");
         setIsSaving(true);
-        await supabase.from('mensajes').insert({ 
+        const { error } = await supabase.from('mensajes').insert({ 
             remitente: user.name, 
             asunto: newItem.title, 
-            contenido: newItem.content, // Aseguramos guardar el contenido
+            contenido: newItem.content,
             leido: false, 
             fecha_envio: new Date().toISOString() 
         });
-        setNewItem({ courseId: '', title: '', date: '', time: '', content: '', type: 'pdf' });
-        await fetchAnnouncements();
+        if (!error) {
+            alert("Anuncio publicado exitosamente.");
+            setNewItem({ courseId: '', title: '', date: '', time: '', content: '', type: 'pdf' });
+            await fetchAnnouncements();
+        } else {
+            console.error(error);
+            alert("Error al publicar anuncio.");
+        }
         setIsSaving(false);
     };
 
@@ -814,6 +849,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 </div>
                             </div>
                             <div className="space-y-6">
+                                {/* Fix: Changed 'description' to 'descripcion' to match CourseAdminData interface */}
                                 <div className="space-y-1"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Descripción General (Resumen)</label><textarea rows={3} value={selectedCourse.descripcion} onChange={e => setSelectedCourse({...selectedCourse, descripcion: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-medium border-none shadow-inner outline-none focus:ring-2 focus:ring-blue-500 transition-all"></textarea></div>
                                 <div className="space-y-1"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Guía Académica y Contenido Detallado</label><textarea rows={8} value={selectedCourse.contenido_detallado} onChange={e => setSelectedCourse({...selectedCourse, contenido_detallado: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 text-sm font-medium border-none shadow-inner outline-none focus:ring-2 focus:ring-blue-500 transition-all"></textarea></div>
                             </div>
@@ -841,23 +877,61 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
 
             {activeTab === 'attendance' && (
                 <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl animate-fade-in border-t-8 border-green-500 space-y-8">
-                    <div className="flex flex-col md:flex-row gap-6 items-end bg-gray-50 p-8 rounded-[2.5rem] shadow-inner border border-gray-100"><div className="flex-1 space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Materia para Pase de Lista</label><select value={attCourse} onChange={e => setAttCourse(e.target.value)} className="w-full p-4 rounded-2xl border-none text-sm font-black uppercase shadow-md outline-none focus:ring-2 focus:ring-green-500 transition-all"><option value="">Seleccionar Materia...</option>{adminCourses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></div><div className="w-full md:w-64 space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fecha de Clase</label><input type="date" value={attDate} onChange={e => setAttDate(e.target.value)} className="w-full p-4 rounded-2xl border-none text-sm font-black shadow-md outline-none"/></div><button onClick={loadAttendanceList} className="bg-green-600 text-white px-10 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-green-700 h-[56px] tracking-widest transition-all transform active:scale-95">Listar Grupo</button></div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">{attList.map(alumno => (
-                        <div 
-                            key={alumno.id} 
-                            onClick={() => cycleAttendance(alumno.id, alumno.estado)} 
-                            className={`flex items-center justify-between p-6 rounded-[2rem] cursor-pointer transition-all border-2 shadow-sm transform hover:-translate-y-1 ${alumno.estado === 'presente' ? 'bg-green-50 border-green-200 shadow-green-100' : alumno.estado === 'ausente' ? 'bg-red-50 border-red-200 shadow-red-100' : 'bg-gray-50 border-gray-100 shadow-inner'}`}
-                        >
-                            <div className="flex items-center">
-                                <img src={alumno.avatar} className="w-12 h-12 rounded-2xl mr-4 border-2 border-white shadow-md object-cover"/>
-                                <div>
-                                    <p className="text-xs font-black text-gray-800 tracking-tight">{alumno.nombre}</p>
-                                    <p className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${alumno.estado === 'ninguno' ? 'text-gray-400' : 'text-blue-500'}`}>{alumno.estado === 'ninguno' ? 'Sin Marcar' : alumno.estado}</p>
-                                </div>
-                            </div>
-                            {alumno.estado === 'presente' ? <CheckCircleIcon className="w-7 h-7 text-green-500"/> : alumno.estado === 'ausente' ? <XIcon className="w-7 h-7 text-red-500"/> : <div className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300"></div>}
+                    <div className="flex flex-col md:flex-row gap-6 items-end bg-gray-50 p-8 rounded-[2.5rem] shadow-inner border border-gray-100">
+                        <div className="flex-1 space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Materia para Pase de Lista</label>
+                            <select 
+                                value={attCourse} 
+                                onChange={e => setAttCourse(e.target.value)} 
+                                className="w-full p-4 rounded-2xl border-none text-sm font-black uppercase shadow-md outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                            >
+                                <option value="">Seleccionar Materia...</option>
+                                {adminCourses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                            </select>
                         </div>
-                    ))}</div>
+                        <div className="w-full md:w-64 space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fecha de Clase</label>
+                            <input 
+                                type="date" 
+                                value={attDate} 
+                                onChange={e => setAttDate(e.target.value)} 
+                                className="w-full p-4 rounded-2xl border-none text-sm font-black shadow-md outline-none"
+                            />
+                        </div>
+                        <button 
+                            onClick={loadAttendanceList} 
+                            disabled={attLoading}
+                            className={`bg-green-600 text-white px-10 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-green-700 h-[56px] tracking-widest transition-all transform active:scale-95 ${attLoading ? 'opacity-50' : ''}`}
+                        >
+                            {attLoading ? 'Buscando...' : 'Listar Grupo'}
+                        </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {attList.length > 0 ? attList.map(alumno => (
+                            <div 
+                                key={alumno.id} 
+                                onClick={() => cycleAttendance(alumno.id, alumno.estado)} 
+                                className={`flex items-center justify-between p-6 rounded-[2rem] cursor-pointer transition-all border-2 shadow-sm transform hover:-translate-y-1 ${alumno.estado === 'presente' ? 'bg-green-50 border-green-200 shadow-green-100' : alumno.estado === 'ausente' ? 'bg-red-50 border-red-200 shadow-red-100' : 'bg-gray-50 border-gray-100 shadow-inner'}`}
+                            >
+                                <div className="flex items-center">
+                                    <img src={alumno.avatar} className="w-12 h-12 rounded-2xl mr-4 border-2 border-white shadow-md object-cover"/>
+                                    <div>
+                                        <p className="text-xs font-black text-gray-800 tracking-tight">{alumno.nombre}</p>
+                                        <p className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${alumno.estado === 'ninguno' ? 'text-gray-400' : 'text-blue-500'}`}>
+                                            {alumno.estado === 'ninguno' ? 'Sin Marcar' : alumno.estado}
+                                        </p>
+                                    </div>
+                                </div>
+                                {alumno.estado === 'presente' ? <CheckCircleIcon className="w-7 h-7 text-green-500"/> : alumno.estado === 'ausente' ? <XIcon className="w-7 h-7 text-red-500"/> : <div className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300"></div>}
+                            </div>
+                        )) : (
+                            <div className="col-span-full py-10 text-center opacity-30">
+                                <UserGroupIcon className="w-16 h-16 mx-auto mb-2"/>
+                                <p className="text-sm font-black uppercase tracking-widest">Seleccione materia y haga clic en Listar Grupo</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -865,7 +939,13 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-indigo-500 h-fit space-y-6">
                         <h3 className="font-black flex items-center text-gray-700 uppercase text-xs tracking-widest"><PlusIcon className="w-6 h-6 mr-3 text-indigo-600"/> Redactar Anuncio</h3>
-                        <div className="space-y-4"><input type="text" value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} placeholder="Asunto del Mensaje" className="w-full p-5 text-xs bg-gray-50 border-none rounded-3xl font-black shadow-inner outline-none"/><textarea rows={5} value={newItem.content} onChange={e => setNewItem({...newItem, content: e.target.value})} placeholder="Escribe aquí el contenido detallado del anuncio para los alumnos..." className="w-full p-5 text-xs bg-gray-50 border-none rounded-3xl font-medium shadow-inner outline-none"></textarea><button onClick={handlePostAnnouncement} className="w-full bg-indigo-600 text-white py-5 rounded-[2.5rem] font-black text-[11px] uppercase shadow-xl hover:bg-indigo-700 flex items-center justify-center tracking-widest transition-all"><SendIcon className="w-5 h-5 mr-3"/> Publicar en Tablón</button></div>
+                        <div className="space-y-4">
+                            <input type="text" value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} placeholder="Asunto del Mensaje" className="w-full p-5 text-xs bg-gray-50 border-none rounded-3xl font-black shadow-inner outline-none"/>
+                            <textarea rows={5} value={newItem.content} onChange={e => setNewItem({...newItem, content: e.target.value})} placeholder="Escribe aquí el contenido detallado del anuncio para los alumnos..." className="w-full p-5 text-xs bg-gray-50 border-none rounded-3xl font-medium shadow-inner outline-none"></textarea>
+                            <button onClick={handlePostAnnouncement} disabled={isSaving} className={`w-full bg-indigo-600 text-white py-5 rounded-[2.5rem] font-black text-[11px] uppercase shadow-xl hover:bg-indigo-700 flex items-center justify-center tracking-widest transition-all ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                <SendIcon className="w-5 h-5 mr-3"/> Publicar en Tablón
+                            </button>
+                        </div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border h-[600px] flex flex-col"><div className="p-8 bg-gray-50 border-b font-black text-[10px] uppercase text-gray-400 tracking-widest">Anuncios Enviados</div><div className="flex-1 overflow-y-auto divide-y">{allAnnouncements.map(msg => (<div key={msg.id} className="p-6 hover:bg-gray-50 transition-all flex justify-between items-start group"><div className="truncate"><p className="text-sm font-black text-gray-800">{msg.asunto}</p><p className="text-[9px] font-black text-indigo-500 uppercase mt-2 flex items-center"><ClockIcon className="w-3.5 h-3.5 mr-1.5"/> {new Date(msg.fecha_envio).toLocaleDateString()} - {new Date(msg.fecha_envio).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p></div><button onClick={() => handleDeleteItem('mensajes', msg.id)} className="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-all"><TrashIcon className="w-5 h-5"/></button></div>))}</div></div>
                 </div>

@@ -163,30 +163,31 @@ const MessagesWidget: React.FC<{ messages: Message[] }> = ({ messages }) => {
                 Anuncios Académicos
             </h2>
             <div className="space-y-4">
-                {messages.map(message => (
-                    <div 
-                        key={message.id} 
-                        onClick={() => setSelectedMsg(message)}
-                        className={`flex items-start space-x-4 p-4 rounded-xl border cursor-pointer transition-all ${!message.isRead ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/50' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
-                    >
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${!message.isRead ? 'bg-indigo-600 text-white animate-pulse' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
-                            <MailIcon className="h-5 w-5"/>
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                            <p className={`text-sm font-bold truncate ${!message.isRead ? 'text-indigo-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
-                                {message.subject}
-                            </p>
-                            <div className="flex items-center space-x-3 mt-1.5">
-                                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{message.from}</span>
-                                <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center"><ClockIcon className="h-3 w-3 mr-1"/>{new Date(message.timestamp).toLocaleDateString()}</span>
+                {messages.length > 0 ? (
+                    messages.map(message => (
+                        <div 
+                            key={message.id} 
+                            onClick={() => setSelectedMsg(message)}
+                            className={`flex items-start space-x-4 p-4 rounded-xl border cursor-pointer transition-all ${!message.isRead ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/50' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
+                        >
+                            <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${!message.isRead ? 'bg-indigo-600 text-white animate-pulse' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
+                                <MailIcon className="h-5 w-5"/>
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                                <p className={`text-sm font-bold truncate ${!message.isRead ? 'text-indigo-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                                    {message.subject}
+                                </p>
+                                <div className="flex items-center space-x-3 mt-1.5">
+                                    <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{message.from}</span>
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center"><ClockIcon className="h-3 w-3 mr-1"/>{new Date(message.timestamp).toLocaleDateString()}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
-                {messages.length === 0 && (
+                    ))
+                ) : (
                     <div className="text-center py-10 opacity-40">
                         <MailIcon className="w-12 h-12 mx-auto mb-2"/>
-                        <p className="text-xs font-bold uppercase tracking-widest">No hay anuncios nuevos</p>
+                        <p className="text-xs font-bold uppercase tracking-widest">No hay anuncios para mostrar</p>
                     </div>
                 )}
             </div>
@@ -212,7 +213,7 @@ const MessagesWidget: React.FC<{ messages: Message[] }> = ({ messages }) => {
                         <div className="p-10">
                             <div className="prose dark:prose-invert max-w-none">
                                 <p className="text-gray-700 dark:text-gray-300 leading-relaxed font-medium whitespace-pre-wrap">
-                                    {selectedMsg.contenido || "Este anuncio no tiene un cuerpo de mensaje detallado."}
+                                    {selectedMsg.contenido || "Cuerpo de mensaje vacío."}
                                 </p>
                             </div>
                             <div className="mt-10 pt-6 border-t dark:border-gray-700 flex justify-between items-center text-gray-400">
@@ -221,7 +222,7 @@ const MessagesWidget: React.FC<{ messages: Message[] }> = ({ messages }) => {
                                     Enviado el {new Date(selectedMsg.timestamp).toLocaleString()}
                                 </span>
                                 <button onClick={() => setSelectedMsg(null)} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all">
-                                    Entendido
+                                    Cerrar Anuncio
                                 </button>
                             </div>
                         </div>

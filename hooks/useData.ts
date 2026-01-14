@@ -129,11 +129,11 @@ export const useRealtimeData = (user: User | null) => {
                         })),
                         messages: (messagesRes.data || []).map(m => ({
                             id: m.id, 
-                            from: m.remitente, 
-                            subject: m.asunto, 
-                            isRead: m.leido, 
-                            timestamp: m.fecha_envio,
-                            contenido: m.contenido // Aseguramos que el contenido viaje al frontend
+                            from: m.remitente || 'Administración', 
+                            subject: m.asunto || 'Sin asunto', 
+                            isRead: !!m.leido, 
+                            timestamp: m.fecha_envio || new Date().toISOString(),
+                            contenido: m.contenido || m.asunto || '' // Fallback si no hay contenido
                         })),
                         calendarEvents: events,
                         loading: false,
@@ -142,7 +142,7 @@ export const useRealtimeData = (user: User | null) => {
                     });
                 }
             } catch (e) {
-                console.error(e);
+                console.error("Error fetching realtime data:", e);
                 if (isMounted) setData(prev => ({ ...prev, loading: false }));
             }
         };
