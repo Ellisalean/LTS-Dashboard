@@ -6,7 +6,8 @@ import {
     AcademicCapIcon, CalendarIcon, CheckIcon, DownloadIcon, MailIcon, 
     BookOpenIcon, SearchIcon, CurrencyDollarIcon, XIcon, 
     ChevronLeftIcon, VideoIcon, MusicIcon, DocumentTextIcon, LinkIcon, 
-    ChartBarIcon, ClockIcon, CheckCircleIcon, SendIcon, UploadIcon
+    ChartBarIcon, ClockIcon, CheckCircleIcon, SendIcon, UploadIcon,
+    ExclamationTriangleIcon
 } from '../Icons.tsx';
 import { SCHOOL_LOGO_URL } from '../../constants.ts';
 // @ts-ignore
@@ -61,6 +62,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [editName, setEditName] = useState('');
     const [editEmail, setEditEmail] = useState('');
     const [editPassword, setEditPassword] = useState('');
+    const [editActivo, setEditActivo] = useState(true);
     const [studentGrades, setStudentGrades] = useState<any[]>([]);
     const [studentInscriptions, setStudentInscriptions] = useState<string[]>([]);
     const [studentPayments, setStudentPayments] = useState<Payment[]>([]);
@@ -143,7 +145,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         const file = e.target.files?.[0];
         if (!file) return;
         
-        setSelectedFile(file); // Guardamos el objeto File real para subirlo al Storage
+        setSelectedFile(file); 
         
         let type: 'pdf' | 'video' | 'audio' | 'link' = 'pdf';
         if (file.type.includes('video')) type = 'video';
@@ -154,7 +156,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             ...newItem, 
             type: type, 
             title: newItem.title || file.name.split('.')[0],
-            content: 'FILE_SELECTED' // Marcador visual
+            content: 'FILE_SELECTED' 
         });
     };
 
@@ -166,14 +168,12 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         setIsSaving(true);
         let finalUrl = newItem.content;
 
-        // LÓGICA DE SUBIDA A SUPABASE STORAGE
         if (newItem.type !== 'link' && selectedFile) {
             try {
                 const fileExt = selectedFile.name.split('.').pop();
                 const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
                 const filePath = `${newItem.courseId}/${fileName}`;
 
-                // Intentar subida
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('recursos')
                     .upload(filePath, selectedFile, {
@@ -183,7 +183,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
 
                 if (uploadError) throw uploadError;
 
-                // Obtener URL Pública
                 const { data: { publicUrl } } = supabase.storage
                     .from('recursos')
                     .getPublicUrl(filePath);
@@ -270,6 +269,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         setEditName(student.nombre);
         setEditEmail(student.email || '');
         setEditPassword(student.password || '');
+        setEditActivo(student.activo);
         await Promise.all([
             fetchStudentGrades(student.id),
             fetchStudentInscriptions(student.id),
@@ -328,9 +328,18 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const handleUpdateProfile = async () => {
         if (!selectedStudent || !hasFullAccess) return;
         setIsSaving(true);
-        await supabase.from('estudiantes').update({ nombre: editName, email: editEmail, password: editPassword }).eq('id', selectedStudent.id);
+        await supabase.from('estudiantes').update({ 
+            nombre: editName, 
+            email: editEmail, 
+            password: editPassword,
+            activo: editActivo 
+        }).eq('id', selectedStudent.id);
+        
+        // Actualizar lista local para que los cambios se vean al volver
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? { ...s, nombre: editName, email: editEmail, password: editPassword, activo: editActivo } : s));
+        
         setIsSaving(false);
-        alert("Perfil actualizado correctamente.");
+        alert("Perfil y estado actualizados correctamente.");
     };
 
     const toggleInscription = async (courseId: string) => {
@@ -498,7 +507,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead><tr className="bg-gray-50 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-8 py-5">Estudiante</th><th className="px-8 py-5">Rol</th><th className="px-8 py-5 text-right">Acciones</th></tr></thead>
+                            <thead><tr className="bg-gray-50 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-8 py-5">Estudiante</th><th className="px-8 py-5">Rol</th><th className="px-8 py-5">Estado</th><th className="px-8 py-5 text-right">Acciones</th></tr></thead>
                             <tbody className="divide-y dark:divide-gray-700">
                                 {students.filter(s => s.nombre.toLowerCase().includes(studentSearchTerm.toLowerCase())).map(s => (
                                     <tr key={s.id} className="hover:bg-blue-50/30 dark:hover:bg-gray-700/30 transition-colors">
@@ -507,6 +516,14 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                             {s.nombre}
                                         </td>
                                         <td className="px-8 py-5 text-xs text-blue-500 font-black uppercase">{s.rol}</td>
+                                        <td className="px-8 py-5">
+                                            <div className="flex items-center">
+                                                <span className={`h-2 w-2 rounded-full mr-2 ${s.activo ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+                                                <span className={`text-[10px] font-black uppercase ${s.activo ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {s.activo ? 'Activo' : 'Inactivo'}
+                                                </span>
+                                            </div>
+                                        </td>
                                         <td className="px-8 py-5 text-right">
                                             <button onClick={() => handleSelectStudent(s)} className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 tracking-widest shadow-lg">Gestionar</button>
                                         </td>
@@ -610,23 +627,58 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border-t-8 border-blue-600">
                             <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center"><PencilIcon className="w-4 h-4 mr-2"/> Perfil Académico</h3>
                             <div className="flex flex-col items-center mb-6">
-                                <img src={selectedStudent.avatar_url} className="w-24 h-24 rounded-3xl shadow-xl border-4 border-white mb-4"/>
-                                <h4 className="text-center font-black text-gray-800 text-lg leading-tight">{selectedStudent.nombre}</h4>
+                                <div className="relative">
+                                    <img src={selectedStudent.avatar_url} className="w-24 h-24 rounded-3xl shadow-xl border-4 border-white mb-4"/>
+                                    <div className={`absolute -bottom-2 -right-2 p-1.5 rounded-full border-4 border-white shadow-lg ${editActivo ? 'bg-green-500' : 'bg-red-500'}`}>
+                                        {editActivo ? <CheckIcon className="w-3 h-3 text-white"/> : <XIcon className="w-3 h-3 text-white"/>}
+                                    </div>
+                                </div>
+                                <h4 className="text-center font-black text-gray-800 text-lg leading-tight mt-2">{selectedStudent.nombre}</h4>
+                                <p className="text-[9px] font-black text-blue-600 uppercase tracking-[0.2em] mt-1">{selectedStudent.rol}</p>
                                 
+                                {/* SELECTOR DE ESTADO ELEGANTE */}
+                                <div className="w-full mt-6 p-1 bg-gray-100 dark:bg-gray-700 rounded-2xl flex relative h-12 shadow-inner">
+                                    <button 
+                                        onClick={() => setEditActivo(true)}
+                                        className={`flex-1 flex items-center justify-center text-[10px] font-black uppercase tracking-widest z-10 transition-colors ${editActivo ? 'text-white' : 'text-gray-400'}`}
+                                    >
+                                        Activo
+                                    </button>
+                                    <button 
+                                        onClick={() => setEditActivo(false)}
+                                        className={`flex-1 flex items-center justify-center text-[10px] font-black uppercase tracking-widest z-10 transition-colors ${!editActivo ? 'text-white' : 'text-gray-400'}`}
+                                    >
+                                        Inactivo
+                                    </button>
+                                    <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 shadow-lg ${editActivo ? 'left-1 bg-green-500' : 'left-[calc(50%+1px)] bg-red-500'}`}></div>
+                                </div>
+
                                 {hasFullAccess && (
                                     <button 
                                         onClick={handleSendCreds} 
                                         disabled={isSaving}
-                                        className="w-full mt-6 bg-amber-500 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-amber-600 transition-all flex items-center justify-center tracking-widest"
+                                        className="w-full mt-4 bg-amber-500 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-amber-600 transition-all flex items-center justify-center tracking-widest"
                                     >
                                         <MailIcon className="w-5 h-5 mr-2"/> Enviar Credenciales
                                     </button>
                                 )}
                             </div>
                             <div className="space-y-4">
-                                <input value={editEmail} onChange={e => setEditEmail(e.target.value)} disabled={!hasFullAccess} className="w-full p-4 rounded-2xl bg-gray-50 text-xs font-bold border-none shadow-inner"/>
-                                {hasFullAccess && <input type="text" value={editPassword} onChange={e => setEditPassword(e.target.value)} placeholder="Contraseña" className="w-full p-4 rounded-2xl bg-gray-50 text-xs font-bold border-none shadow-inner"/>}
-                                {hasFullAccess && <button onClick={handleUpdateProfile} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-[11px] uppercase shadow-lg">Actualizar Datos</button>}
+                                <div className="space-y-1">
+                                    <label className="text-[8px] font-black text-gray-400 uppercase ml-2">Email de Acceso</label>
+                                    <input value={editEmail} onChange={e => setEditEmail(e.target.value)} disabled={!hasFullAccess} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 text-xs font-bold border-none shadow-inner outline-none focus:ring-1 focus:ring-blue-500"/>
+                                </div>
+                                {hasFullAccess && (
+                                    <div className="space-y-1">
+                                        <label className="text-[8px] font-black text-gray-400 uppercase ml-2">Clave de Seguridad</label>
+                                        <input type="text" value={editPassword} onChange={e => setEditPassword(e.target.value)} placeholder="Contraseña" className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 text-xs font-bold border-none shadow-inner outline-none focus:ring-1 focus:ring-blue-500"/>
+                                    </div>
+                                )}
+                                {hasFullAccess && (
+                                    <button onClick={handleUpdateProfile} className="w-full bg-blue-600 text-white py-5 rounded-[1.5rem] font-black text-[10px] uppercase shadow-xl hover:bg-blue-700 transition-all transform active:scale-95">
+                                        Guardar Cambios
+                                    </button>
+                                )}
                             </div>
                         </div>
 
