@@ -88,7 +88,6 @@ export const useRealtimeData = (user: User | null) => {
                     };
                 });
 
-                // --- GENERAR EVENTOS DE CALENDARIO REALES ---
                 const today = new Date();
                 today.setHours(0,0,0,0);
 
@@ -133,7 +132,7 @@ export const useRealtimeData = (user: User | null) => {
                             subject: m.asunto || 'Sin asunto', 
                             isRead: !!m.leido, 
                             timestamp: m.fecha_envio || new Date().toISOString(),
-                            contenido: m.contenido || m.asunto || '' // Fallback si no hay contenido
+                            contenido: m.contenido || m.asunto || 'Sin contenido adicional.' // Fallback seguro
                         })),
                         calendarEvents: events,
                         loading: false,
