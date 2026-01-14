@@ -38,7 +38,6 @@ interface CourseAdminData {
 const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const isAdmin = user.role === 'admin';
     const isTeacher = user.role === 'profesor';
-    // Permitir acciones administrativas a profesores si están en este panel
     const hasFullAccess = isAdmin || isTeacher;
 
     const [activeTab, setActiveTab] = useState<'students' | 'resources' | 'assignments' | 'exams' | 'attendance' | 'announcements' | 'courses'>('students');
@@ -75,6 +74,9 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [newItem, setNewItem] = useState({ 
         courseId: '', title: '', date: '', time: '', content: '', type: 'pdf' as 'pdf' | 'video' | 'audio' | 'link'
     });
+    
+    // Referencia para el archivo real (File object)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Estados Asistencia
@@ -136,30 +138,76 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        
+        setSelectedFile(file); // Guardamos el objeto File real para subirlo al Storage
+        
         let type: 'pdf' | 'video' | 'audio' | 'link' = 'pdf';
         if (file.type.includes('video')) type = 'video';
         else if (file.type.includes('audio')) type = 'audio';
         else if (file.type.includes('pdf')) type = 'pdf';
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            setNewItem({ ...newItem, content: event.target?.result as string, type: type, title: newItem.title || file.name.split('.')[0] });
-        };
-        reader.readAsDataURL(file);
+
+        setNewItem({ 
+            ...newItem, 
+            type: type, 
+            title: newItem.title || file.name.split('.')[0],
+            content: 'FILE_SELECTED' // Marcador visual
+        });
     };
 
     const handlePostResource = async () => {
-        if (!newItem.courseId || !newItem.title || !newItem.content) return alert("Por favor, completa todos los campos del recurso.");
+        if (!newItem.courseId || !newItem.title) return alert("Por favor, completa los campos del recurso.");
+        if (newItem.type !== 'link' && !selectedFile) return alert("Por favor, selecciona un archivo.");
+        if (newItem.type === 'link' && !newItem.content) return alert("Por favor, ingresa el enlace.");
+
         setIsSaving(true);
+        let finalUrl = newItem.content;
+
+        // LÓGICA DE SUBIDA A SUPABASE STORAGE
+        if (newItem.type !== 'link' && selectedFile) {
+            try {
+                const fileExt = selectedFile.name.split('.').pop();
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+                const filePath = `${newItem.courseId}/${fileName}`;
+
+                // Intentar subida
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('recursos')
+                    .upload(filePath, selectedFile, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
+
+                if (uploadError) throw uploadError;
+
+                // Obtener URL Pública
+                const { data: { publicUrl } } = supabase.storage
+                    .from('recursos')
+                    .getPublicUrl(filePath);
+                
+                finalUrl = publicUrl;
+            } catch (err) {
+                console.error("Error en Storage:", err);
+                alert("No se pudo subir el archivo. Asegúrate de que el bucket 'recursos' esté creado y sea público en Supabase.");
+                setIsSaving(false);
+                return;
+            }
+        }
+
         const { error } = await supabase.from('recursos').insert({ 
             course_id: newItem.courseId, 
             titulo: newItem.title, 
-            url: newItem.content, 
+            url: finalUrl, 
             tipo: newItem.type 
         });
+
         if (!error) {
+            alert("¡Éxito! El recurso se ha guardado correctamente.");
             setNewItem({ courseId: '', title: '', date: '', time: '', content: '', type: 'pdf' });
+            setSelectedFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
             await fetchResources();
+        } else {
+            alert("Error al registrar el recurso en la base de datos.");
         }
         setIsSaving(false);
     };
@@ -215,15 +263,23 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
 
     const handleSendCreds = async () => {
         if (!selectedStudent || !hasFullAccess) return;
+        
+        const email = editEmail;
+        const name = editName;
+        const password = editPassword || selectedStudent.password;
+        const role = selectedStudent.rol;
+
+        if (!email) return alert("El estudiante no tiene correo registrado.");
+
         setIsSaving(true);
         try {
             const res = await fetch('/.netlify/functions/send-welcome-email', {
                 method: 'POST',
-                body: JSON.stringify({ email: editEmail, name: editName, password: editPassword, role: selectedStudent.rol })
+                body: JSON.stringify({ email, name, password, role })
             });
-            if (res.ok) alert("Credenciales enviadas correctamente por correo.");
-            else alert("Error al enviar el correo.");
-        } catch (e) { alert("Error de servidor."); }
+            if (res.ok) alert(`Credenciales enviadas correctamente a ${name}`);
+            else alert("Error al enviar el correo. Revisa la configuración del servicio.");
+        } catch (e) { alert("Error de conexión con el servidor."); }
         finally { setIsSaving(false); }
     };
 
@@ -403,7 +459,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead><tr className="bg-gray-50 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-8 py-5">Estudiante</th><th className="px-8 py-5">Rol</th><th className="px-8 py-5 text-right">Acción</th></tr></thead>
+                            <thead><tr className="bg-gray-50 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-8 py-5">Estudiante</th><th className="px-8 py-5">Rol</th><th className="px-8 py-5 text-right">Acciones</th></tr></thead>
                             <tbody className="divide-y dark:divide-gray-700">
                                 {students.filter(s => s.nombre.toLowerCase().includes(studentSearchTerm.toLowerCase())).map(s => (
                                     <tr key={s.id} className="hover:bg-blue-50/30 dark:hover:bg-gray-700/30 transition-colors">
@@ -525,7 +581,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             <input type="text" value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} placeholder="Título / Descripción corta" className="w-full p-4 text-xs bg-gray-50 border-none rounded-2xl font-bold shadow-inner outline-none"/>
                             <div className="grid grid-cols-4 gap-2">
                                 {['pdf', 'video', 'audio', 'link'].map(t => (
-                                    <button key={t} onClick={() => setNewItem({...newItem, type: t as any, content: ''})} className={`p-3 rounded-xl border-2 text-[8px] font-black uppercase transition-all ${newItem.type === t ? 'border-indigo-500 bg-indigo-50 text-indigo-600 shadow-md' : 'border-gray-100 text-gray-400'}`}>{t}</button>
+                                    <button key={t} onClick={() => { setNewItem({...newItem, type: t as any, content: ''}); setSelectedFile(null); }} className={`p-3 rounded-xl border-2 text-[8px] font-black uppercase transition-all ${newItem.type === t ? 'border-indigo-500 bg-indigo-50 text-indigo-600 shadow-md' : 'border-gray-100 text-gray-400'}`}>{t}</button>
                                 ))}
                             </div>
                             
@@ -535,14 +591,21 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                     <input type="text" value={newItem.content} onChange={e => setNewItem({...newItem, content: e.target.value})} placeholder="https://..." className="w-full p-4 text-xs border-2 border-indigo-100 rounded-2xl italic outline-none focus:border-indigo-400 shadow-inner bg-indigo-50/10 transition-all"/>
                                 </div>
                             ) : (
-                                <div onClick={() => fileInputRef.current?.click()} className={`w-full p-10 border-2 border-dashed rounded-[2rem] cursor-pointer text-center flex flex-col items-center transition-all ${newItem.content ? 'border-green-400 bg-green-50 shadow-inner' : 'border-indigo-200 bg-indigo-50/30 hover:bg-indigo-50 hover:border-indigo-400'}`}>
+                                <div onClick={() => fileInputRef.current?.click()} className={`w-full p-10 border-2 border-dashed rounded-[2rem] cursor-pointer text-center flex flex-col items-center transition-all ${selectedFile ? 'border-green-400 bg-green-50 shadow-inner' : 'border-indigo-200 bg-indigo-50/30 hover:bg-indigo-50 hover:border-indigo-400'}`}>
                                     <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                                     <UploadIcon className="w-10 h-10 text-indigo-500 mb-2"/>
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{newItem.content ? 'Archivo Preparado' : 'Haga clic para subir archivo'}</p>
+                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{selectedFile ? `Archivo: ${selectedFile.name}` : 'Haga clic para seleccionar archivo'}</p>
+                                    {selectedFile && <p className="text-[8px] text-green-600 mt-2 font-black uppercase">✓ Archivo listo para subir</p>}
                                 </div>
                             )}
 
-                            <button onClick={handlePostResource} disabled={isSaving} className="w-full py-5 rounded-[2.5rem] font-black text-[11px] bg-indigo-600 text-white uppercase shadow-xl hover:bg-indigo-700 tracking-widest transition-all">Publicar en Biblioteca</button>
+                            <button 
+                                onClick={handlePostResource} 
+                                disabled={isSaving} 
+                                className={`w-full py-5 rounded-[2.5rem] font-black text-[11px] uppercase shadow-xl tracking-widest transition-all ${isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}
+                            >
+                                {isSaving ? 'Subiendo archivo, por favor espere...' : 'Publicar en Biblioteca'}
+                            </button>
                         </div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl overflow-hidden border h-[600px] flex flex-col"><div className="p-8 bg-gray-50 border-b flex justify-between items-center"><h3 className="font-black text-[11px] uppercase text-gray-400 tracking-widest">Biblioteca Digital LTS</h3><span className="bg-indigo-100 text-indigo-600 text-[9px] font-black px-4 py-1.5 rounded-full shadow-sm">{courseResources.length} Archivos Totales</span></div><div className="flex-1 overflow-y-auto divide-y">{courseResources.map(res => (<div key={res.id} className="p-6 flex items-center justify-between hover:bg-gray-100 transition-all"><div className="flex items-center truncate"><div className={`p-4 rounded-2xl mr-5 shadow-sm ${res.type === 'link' ? 'bg-indigo-50 text-indigo-500' : 'bg-blue-50 text-blue-500'}`}>{res.type === 'link' ? <LinkIcon className="w-6 h-6"/> : <DocumentTextIcon className="w-6 h-6"/>}</div><div className="truncate"><p className="text-sm font-black text-gray-800 truncate">{res.title}</p><p className="text-[9px] text-indigo-500 font-black uppercase tracking-widest mt-1">{(adminCourses.find(c => c.id === res.courseId)?.nombre || 'General')}</p></div></div><button onClick={() => handleDeleteItem('recursos', res.id)} className="text-gray-300 hover:text-red-500 p-2 transition-colors"><TrashIcon className="w-5 h-5"/></button></div>))}</div></div>
@@ -608,7 +671,10 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                                     src={selectedCourse.image_url} 
                                                     alt="Vista previa" 
                                                     className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                                                    onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/150?text=Error+Enlace')}
+                                                    onError={(e) => {
+                                                        e.currentTarget.src = 'https://via.placeholder.com/150?text=Error+Enlace';
+                                                        e.currentTarget.className = "w-full h-full object-contain opacity-50";
+                                                    }}
                                                 />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-400 font-black uppercase text-center p-2">Sin Foto</div>
