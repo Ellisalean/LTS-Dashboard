@@ -16,7 +16,7 @@ const WelcomeHeader: React.FC<{ user: User }> = ({ user }) => (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6 text-center md:text-left border-b-4 border-blue-600">
         <img className="h-24 w-24 rounded-full object-cover ring-4 ring-blue-500/30 shadow-lg" src={user.avatarUrl} alt="User Avatar" />
         <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">¡Paz y Bien, {user.name.split(' ')[0]}!</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">¡Bienvenido, {user.name.split(' ')[0]}!</h1>
             
             <div className="mt-2 mb-2 inline-block bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-lg border border-blue-100 dark:border-blue-800">
                 <p className="text-blue-700 dark:text-blue-300 font-bold text-xs tracking-wider uppercase">

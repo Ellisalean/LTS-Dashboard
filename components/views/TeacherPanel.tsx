@@ -68,6 +68,10 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     // Detalle de Materia Seleccionada (Para edición de Admin)
     const [selectedCourse, setSelectedCourse] = useState<CourseAdminData | null>(null);
 
+    // Estado para Nuevo Miembro
+    const [showNewMemberModal, setShowNewMemberModal] = useState(false);
+    const [newMember, setNewMember] = useState({ nombre: '', email: '', password: '', rol: 'estudiante', activo: true });
+
     // Estados para Formularios
     const [newGrade, setNewGrade] = useState({ courseId: '', title: '', score: '' });
     const [newPayment, setNewPayment] = useState({ amount: '', date: new Date().toISOString().split('T')[0], desc: '', method: 'Zelle' });
@@ -230,6 +234,33 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             alert("Información de materia actualizada.");
             await fetchCourses();
             setSelectedCourse(null);
+        }
+        setIsSaving(false);
+    };
+
+    const handleCreateMember = async () => {
+        if (!newMember.nombre || !newMember.email || !newMember.password) return alert("Completa todos los campos obligatorios.");
+        setIsSaving(true);
+        const avatarUrl = `https://i.pravatar.cc/150?u=${encodeURIComponent(newMember.email)}`;
+        
+        const { error } = await supabase.from('estudiantes').insert({
+            nombre: newMember.nombre,
+            email: newMember.email,
+            password: newMember.password,
+            rol: newMember.rol,
+            activo: newMember.activo,
+            avatar_url: avatarUrl,
+            matricula: new Date().toISOString()
+        });
+
+        if (!error) {
+            alert("Miembro creado exitosamente.");
+            setShowNewMemberModal(false);
+            setNewMember({ nombre: '', email: '', password: '', rol: 'estudiante', activo: true });
+            await fetchStudents();
+        } else {
+            console.error(error);
+            alert("Error al crear el miembro en la base de datos.");
         }
         setIsSaving(false);
     };
@@ -451,11 +482,19 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             {/* --- CONTENIDO ESTUDIANTES --- */}
             {activeTab === 'students' && !selectedStudent && (
                  <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border dark:border-gray-700 animate-fade-in">
-                    <div className="p-6 border-b dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20 flex justify-between items-center">
+                    <div className="p-6 border-b dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="relative w-full max-w-lg">
                             <input type="text" placeholder="Buscar alumno..." value={studentSearchTerm} onChange={(e) => setStudentSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white dark:bg-gray-700 shadow-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                             <SearchIcon className="w-6 h-6 absolute left-4 top-3.5 text-blue-500"/>
                         </div>
+                        {isAdmin && (
+                            <button 
+                                onClick={() => setShowNewMemberModal(true)}
+                                className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-green-700 transition-all flex items-center tracking-widest"
+                            >
+                                <PlusIcon className="w-5 h-5 mr-2"/> Nuevo Miembro
+                            </button>
+                        )}
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
@@ -475,6 +514,87 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL PARA NUEVO MIEMBRO */}
+            {showNewMemberModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden border dark:border-gray-700">
+                        <div className="bg-blue-600 p-8 text-white flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-black uppercase tracking-tighter">Registrar Miembro</h3>
+                                <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mt-1">LTS Administration System</p>
+                            </div>
+                            <button onClick={() => setShowNewMemberModal(false)} className="bg-white/20 hover:bg-white/40 p-2 rounded-full transition-colors">
+                                <XIcon className="w-6 h-6"/>
+                            </button>
+                        </div>
+                        <div className="p-10 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Completo</label>
+                                <input 
+                                    type="text" 
+                                    value={newMember.nombre} 
+                                    onChange={e => setNewMember({...newMember, nombre: e.target.value})}
+                                    placeholder="Ej: Juan Pérez"
+                                    className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-none shadow-inner text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Correo Electrónico</label>
+                                <input 
+                                    type="email" 
+                                    value={newMember.email} 
+                                    onChange={e => setNewMember({...newMember, email: e.target.value})}
+                                    placeholder="correo@ejemplo.com"
+                                    className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-none shadow-inner text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contraseña de Acceso</label>
+                                <input 
+                                    type="text" 
+                                    value={newMember.password} 
+                                    onChange={e => setNewMember({...newMember, password: e.target.value})}
+                                    placeholder="Contraseña inicial"
+                                    className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-none shadow-inner text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Rol en Sistema</label>
+                                    <select 
+                                        value={newMember.rol}
+                                        onChange={e => setNewMember({...newMember, rol: e.target.value})}
+                                        className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-none shadow-inner text-sm font-black uppercase focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                    >
+                                        <option value="estudiante">Estudiante</option>
+                                        <option value="profesor">Profesor</option>
+                                        <option value="admin">Administrador</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Estado</label>
+                                    <select 
+                                        value={newMember.activo ? 'true' : 'false'}
+                                        onChange={e => setNewMember({...newMember, activo: e.target.value === 'true'})}
+                                        className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border-none shadow-inner text-sm font-black uppercase focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                    >
+                                        <option value="true">Activo</option>
+                                        <option value="false">Inactivo</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={handleCreateMember}
+                                disabled={isSaving}
+                                className={`w-full py-5 mt-4 rounded-[2rem] font-black text-[11px] uppercase shadow-xl tracking-widest transition-all transform active:scale-95 ${isSaving ? 'bg-gray-400' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                            >
+                                {isSaving ? 'Guardando en la Nube...' : 'Crear Cuenta de Miembro'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
