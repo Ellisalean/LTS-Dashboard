@@ -132,7 +132,7 @@ export const useRealtimeData = (user: User | null) => {
                             subject: m.asunto || 'Sin asunto', 
                             isRead: !!m.leido, 
                             timestamp: m.fecha_envio || new Date().toISOString(),
-                            contenido: m.contenido || m.asunto || 'Sin contenido adicional.' // Fallback seguro
+                            contenido: m.contenido || m.asunto || 'Sin contenido adicional.' 
                         })),
                         calendarEvents: events,
                         loading: false,
