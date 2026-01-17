@@ -62,6 +62,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [editName, setEditName] = useState('');
     const [editEmail, setEditEmail] = useState('');
     const [editPassword, setEditPassword] = useState('');
+    const [editAvatarUrl, setEditAvatarUrl] = useState(''); // Nuevo estado para avatar
     const [editRol, setEditRol] = useState('');
     const [editActivo, setEditActivo] = useState(true);
     const [studentGrades, setStudentGrades] = useState<any[]>([]);
@@ -213,13 +214,14 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             email: editEmail, 
             password: editPassword, 
             rol: editRol,
-            activo: editActivo 
+            activo: editActivo,
+            avatar_url: editAvatarUrl // Guardar nueva URL de imagen
         }).eq('id', selectedStudent.id);
         
         if (!error) {
             alert("Perfil de usuario actualizado correctamente.");
             fetchStudents();
-            setSelectedStudent(prev => prev ? { ...prev, nombre: editName, email: editEmail, password: editPassword, rol: editRol, activo: editActivo } : null);
+            setSelectedStudent(prev => prev ? { ...prev, nombre: editName, email: editEmail, password: editPassword, rol: editRol, activo: editActivo, avatar_url: editAvatarUrl } : null);
         }
         setIsSaving(false);
     };
@@ -330,6 +332,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         setEditName(student.nombre);
         setEditEmail(student.email || '');
         setEditPassword(student.password || '');
+        setEditAvatarUrl(student.avatar_url || ''); // Cargar avatar actual
         setEditRol(student.rol);
         setEditActivo(student.activo);
         const [{ data: g }, { data: i }, { data: p }] = await Promise.all([
@@ -384,7 +387,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                     id: p.id, 
                     nombre: p.nombre, 
                     avatar: p.avatar_url,
-                    estado: hist?.find(h => h.estudiante_id === p.id)?.estado || 'ninguno'
+                    estado: hist?.find(h => h.student_id === p.id || h.estudiante_id === p.id)?.estado || 'ninguno'
                 }));
             setAttList(mapped);
         } catch (e) { console.error(e); }
@@ -516,45 +519,46 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
                         {/* 1. Perfil y Pill Switch de Activación */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-blue-600 text-center flex flex-col min-h-[500px]">
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-blue-600 text-center flex flex-col min-h-[550px]">
                             <div className="relative inline-block mx-auto mb-4">
-                                <img src={selectedStudent.avatar_url} className="w-24 h-24 rounded-[2rem] shadow-xl border-4 border-white object-cover"/>
+                                <img src={editAvatarUrl || selectedStudent.avatar_url} className="w-24 h-24 rounded-[2rem] shadow-xl border-4 border-white object-cover"/>
                             </div>
                             <h4 className="font-black text-gray-800 dark:text-white text-md leading-tight mb-1 uppercase tracking-tighter">{selectedStudent.nombre}</h4>
                             <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mb-4">{editRol}</p>
                             
-                            <div className="space-y-3 text-left flex-1">
-                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Email</label><input value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold shadow-inner border-none outline-none dark:text-gray-800"/></div>
-                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Clave</label><input type="text" value={editPassword} onChange={e => setEditPassword(e.target.value)} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-bold shadow-inner border-none outline-none dark:text-gray-800"/></div>
-                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Rol</label><select value={editRol} onChange={e => setEditRol(e.target.value)} className="w-full p-3 rounded-xl bg-gray-50 text-xs font-black uppercase shadow-inner border-none outline-none dark:text-gray-800"><option value="estudiante">Estudiante</option><option value="profesor">Profesor</option><option value="admin">Administrador</option></select></div>
+                            <div className="space-y-2.5 text-left flex-1">
+                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Email</label><input value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-bold shadow-inner border-none outline-none dark:text-gray-800"/></div>
+                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Clave</label><input type="text" value={editPassword} onChange={e => setEditPassword(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-bold shadow-inner border-none outline-none dark:text-gray-800"/></div>
+                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">URL de Foto</label><input type="text" value={editAvatarUrl} onChange={e => setEditAvatarUrl(e.target.value)} placeholder="https://..." className="w-full p-2.5 rounded-xl bg-gray-50 text-[10px] font-bold shadow-inner border-none outline-none dark:text-gray-800"/></div>
+                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Rol</label><select value={editRol} onChange={e => setEditRol(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-black uppercase shadow-inner border-none outline-none dark:text-gray-800"><option value="estudiante">Estudiante</option><option value="profesor">Profesor</option><option value="admin">Administrador</option></select></div>
                                 
                                 {/* Pill Switch de Activación */}
-                                <div className="pt-4 flex flex-col items-center">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-2">Estado del Usuario</label>
+                                <div className="pt-2 flex flex-col items-center">
+                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Estado del Usuario</label>
                                     <div 
                                         onClick={() => setEditActivo(!editActivo)}
-                                        className={`relative w-44 h-10 rounded-full cursor-pointer transition-all duration-300 p-1 flex items-center ${editActivo ? 'bg-green-500 shadow-inner' : 'bg-gray-300'}`}
+                                        className={`relative w-40 h-9 rounded-full cursor-pointer transition-all duration-300 p-1 flex items-center ${editActivo ? 'bg-green-500 shadow-inner' : 'bg-gray-300'}`}
                                     >
-                                        <div className={`absolute top-1 left-1 w-8 h-8 rounded-full bg-white shadow-md transform transition-transform duration-300 flex items-center justify-center ${editActivo ? 'translate-x-[132px]' : 'translate-x-0'}`}>
-                                            {editActivo ? <CheckIcon className="w-4 h-4 text-green-600"/> : <XIcon className="w-4 h-4 text-gray-400"/>}
+                                        <div className={`absolute top-1 left-1 w-7 h-7 rounded-full bg-white shadow-md transform transition-transform duration-300 flex items-center justify-center ${editActivo ? 'translate-x-[124px]' : 'translate-x-0'}`}>
+                                            {editActivo ? <CheckIcon className="w-3.5 h-3.5 text-green-600"/> : <XIcon className="w-3.5 h-3.5 text-gray-400"/>}
                                         </div>
-                                        <span className={`flex-1 text-center text-[10px] font-black uppercase transition-all ${editActivo ? 'text-white pr-10' : 'text-gray-600 pl-10'}`}>
+                                        <span className={`flex-1 text-center text-[9px] font-black uppercase transition-all ${editActivo ? 'text-white pr-8' : 'text-gray-600 pl-8'}`}>
                                             {editActivo ? 'Activo' : 'Inactivo'}
                                         </span>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="mt-6 space-y-2">
-                                <button onClick={handleSendCreds} className="w-full bg-amber-500 text-white py-3 rounded-xl font-black text-[9px] uppercase shadow-lg hover:bg-amber-600 transition-all flex items-center justify-center active:scale-95"><MailIcon className="w-4 h-4 mr-2"/> Enviar Credenciales</button>
-                                <button onClick={handleUpdateProfile} className="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-[9px] uppercase shadow-lg hover:bg-blue-700 transition-all active:scale-95">Guardar Cambios</button>
+                            <div className="mt-5 space-y-2">
+                                <button onClick={handleSendCreds} className="w-full bg-amber-500 text-white py-2.5 rounded-xl font-black text-[9px] uppercase shadow-lg hover:bg-amber-600 transition-all flex items-center justify-center active:scale-95"><MailIcon className="w-3.5 h-3.5 mr-2"/> Enviar Credenciales</button>
+                                <button onClick={handleUpdateProfile} className="w-full bg-blue-600 text-white py-2.5 rounded-xl font-black text-[9px] uppercase shadow-lg hover:bg-blue-700 transition-all active:scale-95">Guardar Cambios</button>
                             </div>
                         </div>
 
                         {/* 2. Inscripciones / Materias */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-green-500 flex flex-col min-h-[500px]">
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-green-500 flex flex-col min-h-[550px]">
                              <h3 className="text-[9px] font-black uppercase mb-4 flex items-center text-gray-400 tracking-widest"><BookOpenIcon className="w-4 h-4 mr-2"/> Inscripciones</h3>
-                             <div className="space-y-1.5 overflow-y-auto max-h-[400px] pr-2">
+                             <div className="space-y-1.5 overflow-y-auto max-h-[450px] pr-2">
                                 {adminCourses.map(course => {
                                     const isEnrolled = studentInscriptions.includes(course.id);
                                     return (
@@ -568,7 +572,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                         </div>
 
                         {/* 3. Carga y Lista de Notas */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-amber-500 flex flex-col min-h-[500px]">
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-amber-500 flex flex-col min-h-[550px]">
                              <h3 className="text-[9px] font-black uppercase mb-4 flex items-center text-gray-400 tracking-widest"><ChartBarIcon className="w-4 h-4 mr-2"/> Calificaciones</h3>
                              
                              <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-3xl border mb-4 space-y-2 shadow-inner border-green-50">
@@ -577,7 +581,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 <div className="flex gap-1.5"><input type="number" placeholder="Nota" value={newGrade.score} onChange={e => setNewGrade({...newGrade, score: e.target.value})} className="flex-1 p-2.5 text-[10px] font-black rounded-lg bg-white border-none shadow-sm dark:text-gray-800"/><button onClick={handleAddGrade} className="bg-green-600 text-white p-2.5 rounded-lg hover:bg-green-700 transition-all shadow-md active:scale-95"><PlusIcon className="w-5 h-5"/></button></div>
                              </div>
 
-                             <div className="space-y-2 overflow-y-auto max-h-[250px] pr-2">
+                             <div className="space-y-2 overflow-y-auto max-h-[300px] pr-2">
                                 {studentGrades.map(g => (
                                     <div key={g.id} className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl flex justify-between items-center group shadow-sm transition-all border border-transparent hover:border-amber-100">
                                         <div className="truncate text-left flex-1"><p className="text-[8px] font-black text-blue-500 uppercase">{(adminCourses.find(c => c.id === g.curso_id)?.nombre || 'G').substring(0,18)}</p><p className="text-[10px] font-bold truncate text-gray-700 dark:text-gray-200">{g.titulo_asignacion}</p></div>
@@ -588,7 +592,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                         </div>
 
                         {/* 4. Pagos / Historial */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-indigo-500 flex flex-col min-h-[500px]">
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-indigo-500 flex flex-col min-h-[550px]">
                              <h3 className="text-[9px] font-black uppercase mb-4 flex items-center text-gray-400 tracking-widest"><CurrencyDollarIcon className="w-4 h-4 mr-2"/> Pagos</h3>
                              
                              <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-3xl border mb-4 space-y-2 shadow-inner border-indigo-100">
@@ -597,7 +601,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 <button onClick={handleAddPayment} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-black text-[9px] uppercase shadow-lg hover:bg-indigo-700 transition-all active:scale-95">Registrar</button>
                              </div>
 
-                             <div className="space-y-2 overflow-y-auto max-h-[250px] pr-2">
+                             <div className="space-y-2 overflow-y-auto max-h-[300px] pr-2">
                                 {studentPayments.map(p => (
                                     <div key={p.id} className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl flex justify-between items-center group shadow-sm hover:bg-white border border-transparent hover:border-indigo-100">
                                         <div className="truncate text-left"><p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">{p.date}</p><p className="text-[10px] font-bold truncate text-gray-700 dark:text-gray-200">{p.method}</p></div>
