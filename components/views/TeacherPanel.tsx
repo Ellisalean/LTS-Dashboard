@@ -401,37 +401,43 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         
         let nextStatus = currentStatus === 'ninguno' ? 'presente' : currentStatus === 'presente' ? 'ausente' : 'ninguno';
         
-        // Optimista: Cambiamos la UI antes de esperar al servidor para mayor fluidez
+        // Cambio de UI optimista para velocidad
         const previousList = [...attList];
         setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
         setSavingAttendanceId(studentId);
 
         try {
             if (nextStatus === 'ninguno') {
-                // Borrar el registro si volvemos a 'ninguno'
-                const { error } = await supabase.from('asistencias')
+                // Borrar registro usando filtros encadenados explícitos (más robusto que .match())
+                const { error, count } = await supabase.from('asistencias')
                     .delete()
-                    .match({ 
-                        estudiante_id: studentId, 
-                        curso_id: attCourse, 
-                        fecha: attDate 
-                    });
-                if (error) throw error;
+                    .eq('estudiante_id', studentId)
+                    .eq('curso_id', attCourse)
+                    .eq('fecha', attDate);
+                
+                if (error) {
+                    console.error("Error al borrar asistencia:", error);
+                    throw error;
+                }
             } else {
-                // Upsert para presente o ausente
+                // Guardar/Actualizar
                 const { error } = await supabase.from('asistencias').upsert({ 
                     estudiante_id: studentId, 
                     curso_id: attCourse, 
                     fecha: attDate, 
                     estado: nextStatus 
                 }, { onConflict: 'estudiante_id,curso_id,fecha' });
-                if (error) throw error;
+                
+                if (error) {
+                    console.error("Error al guardar asistencia:", error);
+                    throw error;
+                }
             }
-        } catch (err) {
-            console.error("Fallo al guardar asistencia:", err);
-            // Revertir en caso de error
+        } catch (err: any) {
+            console.error("Fallo completo en sincronización:", err);
+            // Revertir UI si falla
             setAttList(previousList);
-            alert("No se pudo sincronizar la asistencia. Por favor, verifica tu conexión y asegúrate de haber elegido la materia correctamente.");
+            alert("No se pudo sincronizar la asistencia en el servidor. Esto puede deberse a permisos de la base de datos o conexión inestable.");
         } finally {
             setSavingAttendanceId(null);
         }
