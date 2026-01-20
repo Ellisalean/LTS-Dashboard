@@ -41,7 +41,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const isTeacher = user.role === 'profesor';
     const hasFullAccess = isAdmin || isTeacher;
 
-    const [activeTab, setActiveTab] = useState<'students' | 'resources' | 'assignments' | 'exams' | 'attendance' | 'announcements' | 'courses'>('students');
+    const [activeTab, setActiveTab] = useState<'students' | 'courses' | 'resources' | 'attendance' | 'announcements'>('students');
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -49,8 +49,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [students, setStudents] = useState<StudentData[]>([]);
     const [adminCourses, setAdminCourses] = useState<CourseAdminData[]>([]);
     const [courseResources, setCourseResources] = useState<Resource[]>([]);
-    const [allAssignments, setAllAssignments] = useState<any[]>([]);
-    const [allExams, setAllExams] = useState<any[]>([]);
     const [allAnnouncements, setAllAnnouncements] = useState<any[]>([]);
     
     // Buscadores
@@ -86,7 +84,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
-    // --- ESTADOS ASISTENCIA OPTIMIZADOS ---
+    // --- ESTADOS ASISTENCIA ---
     const [attCourse, setAttCourse] = useState('');
     const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
     const [attList, setAttList] = useState<any[]>([]);
@@ -103,8 +101,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             fetchStudents(), 
             fetchCourses(), 
             fetchResources(), 
-            fetchAssignments(), 
-            fetchExams(),
             fetchAnnouncements()
         ]);
         setLoading(false);
@@ -125,16 +121,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         if (data) setCourseResources(data.map((r: any) => ({
             id: r.id, courseId: r.course_id, title: r.titulo, url: r.url, type: r.tipo
         })));
-    };
-
-    const fetchAssignments = async () => {
-        const { data } = await supabase.from('asignaciones').select('*').order('fecha_entrega', { ascending: false });
-        if (data) setAllAssignments(data);
-    };
-
-    const fetchExams = async () => {
-        const { data } = await supabase.from('examenes').select('*').order('fecha', { ascending: false });
-        if (data) setAllExams(data);
     };
 
     const fetchAnnouncements = async () => {
@@ -295,7 +281,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     };
 
     const handleAddGrade = async () => {
-        if (!newGrade.courseId || !newGrade.score || !selectedStudent) return alert("Completa los datos de la nota (Materia y Puntuación).");
+        if (!newGrade.courseId || !newGrade.score || !selectedStudent) return alert("Completa los datos de la nota.");
         const { error } = await supabase.from('notas').insert({
             estudiante_id: selectedStudent.id,
             curso_id: newGrade.courseId,
@@ -304,14 +290,14 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             puntuacion_maxima: 100
         });
         if (!error) {
-            alert("Calificación cargada con éxito.");
+            alert("Nota cargada.");
             setNewGrade({ courseId: '', title: '', score: '' });
             handleSelectStudent(selectedStudent);
         }
     };
 
     const handleAddPayment = async () => {
-        if (!newPayment.amount || !selectedStudent) return alert("Ingresa el monto del pago.");
+        if (!newPayment.amount || !selectedStudent) return alert("Ingresa el monto.");
         const { error } = await supabase.from('pagos').insert({
             student_id: selectedStudent.id,
             amount: parseFloat(newPayment.amount),
@@ -322,7 +308,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             type: 'tuition'
         });
         if (!error) {
-            alert("Abono registrado correctamente.");
+            alert("Pago registrado.");
             setNewPayment({ amount: '', date: new Date().toISOString().split('T')[0], desc: '', method: 'Zelle' });
             handleSelectStudent(selectedStudent);
         }
@@ -363,36 +349,26 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     };
 
     const handleDeleteItem = async (table: string, id: string) => {
-        if (!confirm("¿Deseas eliminar este registro definitivamente?")) return;
+        if (!confirm("¿Deseas eliminar este registro?")) return;
         await supabase.from(table).delete().eq('id', id);
         fetchInitialData();
     };
 
-    // --- SECCIÓN ASISTENCIA: REINICIO Y GUARDADO SEGURO ---
+    // --- LÓGICA DE ASISTENCIA SEGURA ---
     const handleResetDailyAttendance = async () => {
         if (!attCourse) return alert("Selecciona la materia.");
-        if (!confirm(`¿Estás seguro de REINICIAR toda la asistencia para ${adminCourses.find(c => c.id === attCourse)?.nombre} el día ${attDate}? Esto eliminará los datos previos para empezar de cero.`)) return;
-        
+        if (!confirm(`¿Eliminar TODOS los registros de asistencia de hoy para esta materia?`)) return;
         setAttLoading(true);
         try {
-            const { error } = await supabase
-                .from('asistencias')
-                .delete()
-                .eq('curso_id', attCourse)
-                .eq('fecha', attDate);
-            
-            if (error) throw error;
-            alert("Asistencia reiniciada. Los alumnos verán su historial limpio para esta fecha.");
+            await supabase.from('asistencias').delete().eq('curso_id', attCourse).eq('fecha', attDate);
+            alert("Asistencia diaria reiniciada.");
             loadAttendanceList();
-        } catch (e: any) {
-            alert(`Error al reiniciar: ${e.message}`);
-        } finally {
-            setAttLoading(false);
-        }
+        } catch (e) { console.error(e); }
+        finally { setAttLoading(false); }
     };
 
     const loadAttendanceList = async () => {
-        if (!attCourse) return alert("Selecciona una materia primero.");
+        if (!attCourse) return alert("Selecciona una materia.");
         setAttLoading(true);
         try {
             const { data: inscritos } = await supabase.from('inscripciones').select('estudiante_id').eq('curso_id', attCourse);
@@ -419,72 +395,46 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
 
     const handleSetAttendanceSafe = async (studentId: string, status: 'presente' | 'ausente' | 'ninguno') => {
         if (savingId) return;
-        if (!attCourse) return alert("Selecciona la materia.");
+        if (!attCourse) return alert("Selecciona materia.");
 
         setSavingId(studentId);
-        // Actualización optimista local
         setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: status } : a));
 
         try {
-            // 1. LIMPIEZA PREVIA (Reiniciar estado individual para evitar conflictos)
-            await supabase
-                .from('asistencias')
-                .delete()
-                .eq('estudiante_id', studentId)
-                .eq('curso_id', attCourse)
-                .eq('fecha', attDate);
-
-            // 2. INSERTAR NUEVO ESTADO (Si no es 'ninguno')
+            // Borrar e Insertar para asegurar consistencia
+            await supabase.from('asistencias').delete().eq('estudiante_id', studentId).eq('curso_id', attCourse).eq('fecha', attDate);
             if (status !== 'ninguno') {
-                const { error } = await supabase
-                    .from('asistencias')
-                    .insert({ 
-                        estudiante_id: studentId, 
-                        curso_id: attCourse, 
-                        fecha: attDate, 
-                        estado: status 
-                    });
-                if (error) throw error;
+                await supabase.from('asistencias').insert({ estudiante_id: studentId, curso_id: attCourse, fecha: attDate, estado: status });
             }
-        } catch (err: any) {
-            console.error("Error al sincronizar asistencia:", err);
-            alert("Error de conexión. El cambio no se guardó en el servidor.");
-            loadAttendanceList(); // Revertir a la versión real del servidor
-        } finally {
-            setSavingId(null);
-        }
+        } catch (err) { alert("Error de sincronización."); loadAttendanceList(); }
+        finally { setSavingId(null); }
     };
 
     const handlePostAnnouncement = async () => {
-        if (!newItem.title || !newItem.content) return alert("Completa los campos del aviso.");
+        if (!newItem.title || !newItem.content) return alert("Completa el anuncio.");
         setIsSaving(true);
-        const { error } = await supabase.from('mensajes').insert({ 
-            remitente: user.name, asunto: newItem.title, contenido: newItem.content, 
-            leido: false, fecha_envio: new Date().toISOString() 
-        });
-        if (!error) alert("Anuncio académico publicado.");
+        await supabase.from('mensajes').insert({ remitente: user.name, asunto: newItem.title, contenido: newItem.content, leido: false, fecha_envio: new Date().toISOString() });
+        alert("Anuncio publicado.");
         setNewItem({ courseId: '', title: '', date: '', time: '', content: '', type: 'pdf' });
         fetchAnnouncements();
         setIsSaving(false);
     };
 
-    if (loading) return <div className="p-20 text-center animate-pulse text-blue-600 font-black tracking-widest uppercase">Cargando Administración LTS Cloud...</div>;
+    if (loading) return <div className="p-20 text-center animate-pulse text-blue-600 font-black tracking-widest uppercase">Cargando Panel Maestro LTS...</div>;
 
     return (
         <div className="space-y-6 pb-20 max-w-[1600px] mx-auto px-4 animate-fade-in">
             <h1 className="text-3xl font-black flex items-center text-gray-800 dark:text-white tracking-tighter uppercase">
                 <AcademicCapIcon className="h-9 w-9 mr-4 text-blue-600"/>
-                Administración General LTS
+                Gestión Centralizada LTS Cloud
             </h1>
 
-            {/* NAVEGACIÓN */}
+            {/* TABS DE NAVEGACIÓN */}
             <div className="flex space-x-1 bg-gray-200 dark:bg-gray-700/50 p-1.5 rounded-3xl overflow-x-auto shadow-inner border dark:border-gray-700">
                 {[
                     { id: 'students', label: 'Estudiantes / Staff', icon: UserGroupIcon },
-                    { id: 'courses', label: 'Materias', icon: BookOpenIcon },
+                    { id: 'courses', label: 'Cátedras', icon: BookOpenIcon },
                     { id: 'resources', label: 'Biblioteca', icon: LinkIcon },
-                    { id: 'assignments', label: 'Tareas', icon: ClipboardListIcon },
-                    { id: 'exams', label: 'Exámenes', icon: AcademicCapIcon },
                     { id: 'attendance', label: 'Asistencia', icon: CheckIcon },
                     { id: 'announcements', label: 'Anuncios', icon: MailIcon },
                 ].map(tab => (
@@ -498,135 +448,92 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 ))}
             </div>
 
-            {/* TAB: ASISTENCIA REDISEÑADA (PILL SWITCH + REINICIO) */}
+            {/* TAB: ASISTENCIA */}
             {activeTab === 'attendance' && (
                 <div className="bg-white dark:bg-gray-800 p-10 rounded-[3.5rem] shadow-2xl border-t-8 border-green-500 space-y-10 animate-fade-in">
-                    <div className="flex flex-col md:flex-row gap-6 items-end bg-gray-50 dark:bg-gray-900/50 p-8 rounded-[3rem] border dark:border-gray-700 shadow-inner relative overflow-hidden">
+                    <div className="flex flex-col md:flex-row gap-6 items-end bg-gray-50 dark:bg-gray-900/50 p-8 rounded-[3rem] border dark:border-gray-700 shadow-inner">
                         <div className="flex-1 space-y-2 text-left">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Elegir Materia / Clase</label>
-                            <select value={attCourse} onChange={e => setAttCourse(e.target.value)} className="w-full p-4 rounded-2xl border-none text-sm font-black uppercase shadow-lg focus:ring-2 focus:ring-green-500 outline-none dark:text-gray-800"><option value="">Selecciona una cátedra...</option>{adminCourses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Seleccionar Materia</label>
+                            <select value={attCourse} onChange={e => setAttCourse(e.target.value)} className="w-full p-4 rounded-2xl border-none text-sm font-black uppercase shadow-lg focus:ring-2 focus:ring-green-500 outline-none dark:text-gray-800"><option value="">Selecciona cátedra...</option>{adminCourses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
                         </div>
                         <div className="w-full md:w-64 space-y-2 text-left">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Fecha del Día de Clase</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Fecha de Clase</label>
                             <input type="date" value={attDate} onChange={e => setAttDate(e.target.value)} className="w-full p-4 rounded-2xl border-none text-sm font-black shadow-lg outline-none dark:text-gray-800"/>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={loadAttendanceList} disabled={attLoading} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-green-700 h-[56px] disabled:opacity-50 transition-all active:scale-95">
-                                Listar Grupo
-                            </button>
-                            {attList.length > 0 && (
-                                <button onClick={handleResetDailyAttendance} className="bg-red-50 text-red-600 border border-red-200 px-6 py-4 rounded-2xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all h-[56px] active:scale-95" title="Borrar toda la asistencia de hoy para esta materia">
-                                    <TrashIcon className="w-5 h-5"/>
-                                </button>
-                            )}
+                            <button onClick={loadAttendanceList} disabled={attLoading} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-green-700 h-[56px] active:scale-95">Listar</button>
+                            {attList.length > 0 && <button onClick={handleResetDailyAttendance} className="bg-red-50 text-red-600 border border-red-100 px-6 py-4 rounded-2xl hover:bg-red-600 hover:text-white transition-all h-[56px] shadow-sm"><TrashIcon className="w-5 h-5"/></button>}
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {attList.length > 0 ? attList.map(alumno => (
-                            <div 
-                                key={alumno.id} 
-                                className={`flex flex-col p-6 rounded-[2.5rem] bg-gray-50 dark:bg-gray-700/30 border-2 transition-all shadow-sm ${savingId === alumno.id ? 'opacity-50 border-blue-200' : 'border-transparent hover:border-blue-100'}`}
-                            >
+                        {attList.map(alumno => (
+                            <div key={alumno.id} className={`flex flex-col p-6 rounded-[2.5rem] bg-gray-50 dark:bg-gray-700/30 border-2 transition-all shadow-sm ${savingId === alumno.id ? 'opacity-50 border-blue-300' : 'border-transparent hover:border-blue-100'}`}>
                                 <div className="flex items-center mb-6">
                                     <img src={alumno.avatar} className="w-14 h-14 rounded-2xl mr-4 border-2 border-white shadow-md object-cover"/>
-                                    <div className="flex-1 overflow-hidden text-left">
+                                    <div className="flex-1 text-left overflow-hidden">
                                         <p className="text-xs font-black text-gray-800 dark:text-white truncate uppercase tracking-tighter">{alumno.nombre}</p>
                                         <div className="flex items-center mt-1">
-                                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${alumno.estado === 'presente' ? 'bg-green-100 text-green-700' : alumno.estado === 'ausente' ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-500'}`}>
-                                                {alumno.estado === 'ninguno' ? 'Sin Marca' : alumno.estado}
-                                            </span>
+                                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${alumno.estado === 'presente' ? 'bg-green-100 text-green-700' : alumno.estado === 'ausente' ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-500'}`}>{alumno.estado}</span>
                                             {savingId === alumno.id && <div className="ml-2 w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
                                         </div>
                                     </div>
                                 </div>
-                                
-                                {/* SELECTOR SEGMENTADO (PILL SWITCH) - SIN AMBIGÜEDADES */}
-                                <div className="flex bg-white dark:bg-gray-800 p-1 rounded-2xl shadow-inner border dark:border-gray-700 gap-1 overflow-hidden">
-                                    <button 
-                                        onClick={() => handleSetAttendanceSafe(alumno.id, 'presente')}
-                                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center tracking-tighter ${alumno.estado === 'presente' ? 'bg-green-500 text-white shadow-md scale-[1.02]' : 'text-gray-400 hover:bg-gray-50 hover:text-green-600'}`}
-                                    >
-                                        Presente
-                                    </button>
-                                    <button 
-                                        onClick={() => handleSetAttendanceSafe(alumno.id, 'ausente')}
-                                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center tracking-tighter ${alumno.estado === 'ausente' ? 'bg-red-500 text-white shadow-md scale-[1.02]' : 'text-gray-400 hover:bg-gray-50 hover:text-red-600'}`}
-                                    >
-                                        Ausente
-                                    </button>
-                                    <button 
-                                        onClick={() => handleSetAttendanceSafe(alumno.id, 'ninguno')}
-                                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center tracking-tighter ${alumno.estado === 'ninguno' ? 'bg-gray-400 text-white shadow-md' : 'text-gray-300 hover:bg-gray-100'}`}
-                                    >
-                                        Limpiar
-                                    </button>
+                                <div className="flex bg-white dark:bg-gray-800 p-1 rounded-2xl shadow-inner border dark:border-gray-700 gap-1">
+                                    <button onClick={() => handleSetAttendanceSafe(alumno.id, 'presente')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${alumno.estado === 'presente' ? 'bg-green-500 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}>Presente</button>
+                                    <button onClick={() => handleSetAttendanceSafe(alumno.id, 'ausente')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${alumno.estado === 'ausente' ? 'bg-red-500 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}>Ausente</button>
+                                    <button onClick={() => handleSetAttendanceSafe(alumno.id, 'ninguno')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${alumno.estado === 'ninguno' ? 'bg-gray-400 text-white shadow-md' : 'text-gray-300 hover:bg-gray-50'}`}>Limpiar</button>
                                 </div>
                             </div>
-                        )) : (
-                            <div className="col-span-full py-24 text-center opacity-30 text-sm font-black uppercase flex flex-col items-center">
-                                <UserGroupIcon className="w-20 h-20 mb-4"/>
-                                <p>Selecciona una cátedra arriba para iniciar el control de hoy</p>
-                            </div>
-                        )}
+                        ))}
                     </div>
                 </div>
             )}
 
-            {/* TAB: ESTUDIANTES / STAFF */}
+            {/* TAB: ESTUDIANTES */}
             {activeTab === 'students' && !selectedStudent && (
                  <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl overflow-hidden border dark:border-gray-700 animate-fade-in">
                     <div className="p-6 border-b dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50">
                         <div className="relative w-full max-w-lg group">
-                            <input type="text" placeholder="Buscar por nombre de usuario..." value={studentSearchTerm} onChange={(e) => setStudentSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white dark:bg-gray-700 shadow-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white" />
+                            <input type="text" placeholder="Buscar por nombre..." value={studentSearchTerm} onChange={(e) => setStudentSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white dark:bg-gray-700 shadow-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white" />
                             <SearchIcon className="w-6 h-6 absolute left-4 top-3.5 text-blue-500 group-focus-within:text-blue-600 transition-colors"/>
                         </div>
-                        {isAdmin && (
-                            <button onClick={() => setShowNewMemberModal(true)} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-green-700 transition-all flex items-center tracking-widest active:scale-95"><PlusIcon className="w-5 h-5 mr-2"/> Registrar Nuevo Miembro</button>
-                        )}
+                        {isAdmin && <button onClick={() => setShowNewMemberModal(true)} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-green-700 transition-all flex items-center active:scale-95"><PlusIcon className="w-5 h-5 mr-2"/> Nuevo Miembro</button>}
                     </div>
-                    <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-100 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-8 py-5">Identidad</th><th className="px-8 py-5">Rol Académico</th><th className="px-8 py-5">Estado</th><th className="px-8 py-5 text-right">Ficha</th></tr></thead><tbody className="divide-y dark:divide-gray-700">{students.filter(s => s.nombre.toLowerCase().includes(studentSearchTerm.toLowerCase())).map(s => (<tr key={s.id} className="hover:bg-blue-50/30 transition-colors group"><td className="px-8 py-5 flex items-center font-bold text-sm text-gray-800 dark:text-gray-200"><img src={s.avatar_url} className="w-12 h-12 rounded-2xl mr-5 shadow-md border-2 border-white group-hover:scale-110 transition-transform object-cover"/>{s.nombre}</td><td className="px-8 py-5 text-[10px] text-blue-500 font-black uppercase tracking-widest">{s.rol}</td><td className="px-8 py-5"><span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase ${s.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.activo ? 'Activo' : 'Inactivo'}</span></td><td className="px-8 py-5 text-right"><button onClick={() => handleSelectStudent(s)} className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 tracking-widest shadow-lg transition-all active:scale-95">Gestionar Ficha</button></td></tr>))}</tbody></table></div>
+                    <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-100 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-8 py-5">Identidad</th><th className="px-8 py-5">Rol Académico</th><th className="px-8 py-5">Estado</th><th className="px-8 py-5 text-right">Ficha</th></tr></thead><tbody className="divide-y dark:divide-gray-700">{students.filter(s => s.nombre.toLowerCase().includes(studentSearchTerm.toLowerCase())).map(s => (<tr key={s.id} className="hover:bg-blue-50/30 transition-colors group"><td className="px-8 py-5 flex items-center font-bold text-sm text-gray-800 dark:text-gray-200"><img src={s.avatar_url} className="w-12 h-12 rounded-2xl mr-5 shadow-md border-2 border-white object-cover"/>{s.nombre}</td><td className="px-8 py-5 text-[10px] text-blue-500 font-black uppercase tracking-widest">{s.rol}</td><td className="px-8 py-5"><span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase ${s.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.activo ? 'Activo' : 'Inactivo'}</span></td><td className="px-8 py-5 text-right"><button onClick={() => handleSelectStudent(s)} className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 tracking-widest shadow-lg transition-all active:scale-95">Gestionar</button></td></tr>))}</tbody></table></div>
                 </div>
             )}
-            
-            {/* EDITOR ESTUDIANTE */}
+
+            {/* EDITOR ALUMNO (Versión completa) */}
             {activeTab === 'students' && selectedStudent && (
                 <div className="animate-fade-in space-y-6">
                     <button onClick={() => setSelectedStudent(null)} className="flex items-center text-blue-600 font-black uppercase text-[10px] tracking-widest bg-white px-5 py-2.5 rounded-xl shadow-sm hover:bg-gray-50 transition-all active:scale-95"><ChevronLeftIcon className="h-5 w-5 mr-1"/> Volver</button>
-                    
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
-                         {/* Ficha Perfil */}
+                         {/* Perfil */}
                          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-blue-600 text-center flex flex-col min-h-[550px]">
                             <img src={editAvatarUrl || selectedStudent.avatar_url} className="w-24 h-24 rounded-[2rem] shadow-xl border-4 border-white object-cover mx-auto mb-4"/>
                             <h4 className="font-black text-gray-800 dark:text-white text-md uppercase tracking-tighter">{selectedStudent.nombre}</h4>
-                            <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mb-4">{editRol}</p>
-                            
-                            <div className="space-y-2.5 text-left flex-1">
-                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Email</label><input value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-bold shadow-inner border-none outline-none dark:text-gray-800"/></div>
-                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Clave</label><input type="text" value={editPassword} onChange={e => setEditPassword(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-bold shadow-inner border-none outline-none dark:text-gray-800"/></div>
-                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Rol</label><select value={editRol} onChange={e => setEditRol(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-black uppercase shadow-inner border-none outline-none dark:text-gray-800"><option value="estudiante">Estudiante</option><option value="profesor">Profesor</option><option value="admin">Administrador</option></select></div>
-                                <div className="pt-2 flex flex-col items-center">
-                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Estado</label>
-                                    <div onClick={() => setEditActivo(!editActivo)} className={`relative w-40 h-9 rounded-full cursor-pointer transition-all duration-300 p-1 flex items-center ${editActivo ? 'bg-green-500 shadow-inner' : 'bg-gray-300'}`}>
-                                        <div className={`absolute top-1 left-1 w-7 h-7 rounded-full bg-white shadow-md transform transition-transform duration-300 flex items-center justify-center ${editActivo ? 'translate-x-[124px]' : 'translate-x-0'}`}>{editActivo ? <CheckIcon className="w-3.5 h-3.5 text-green-600"/> : <XIcon className="w-3.5 h-3.5 text-gray-400"/>}</div>
-                                        <span className={`flex-1 text-center text-[9px] font-black uppercase transition-all ${editActivo ? 'text-white pr-8' : 'text-gray-600 pl-8'}`}>{editActivo ? 'Activo' : 'Inactivo'}</span>
-                                    </div>
-                                </div>
+                            <div className="space-y-2.5 text-left flex-1 mt-4">
+                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Email</label><input value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-bold border-none outline-none dark:text-gray-800 shadow-inner"/></div>
+                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Contraseña</label><input type="text" value={editPassword} onChange={e => setEditPassword(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-bold border-none outline-none dark:text-gray-800 shadow-inner"/></div>
+                                <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Rol</label><select value={editRol} onChange={e => setEditRol(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-black uppercase border-none outline-none dark:text-gray-800 shadow-inner"><option value="estudiante">Estudiante</option><option value="profesor">Profesor</option><option value="admin">Administrador</option></select></div>
                             </div>
                             <div className="mt-5 space-y-2">
-                                <button onClick={handleUpdateProfile} className="w-full bg-blue-600 text-white py-2.5 rounded-xl font-black text-[9px] uppercase shadow-lg hover:bg-blue-700 transition-all active:scale-95">Guardar Cambios</button>
+                                <button onClick={handleUpdateProfile} className="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-[9px] uppercase shadow-lg">Actualizar Perfil</button>
+                                <button onClick={handleSendCreds} className="w-full bg-green-50 text-green-700 py-3 rounded-xl font-black text-[9px] uppercase border border-green-200">Enviar Credenciales</button>
+                                <button onClick={handleDownloadPDF} className="w-full bg-indigo-50 text-indigo-700 py-3 rounded-xl font-black text-[9px] uppercase border border-indigo-200">Boletín PDF</button>
                             </div>
                          </div>
                          {/* Inscripciones */}
                          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-green-500 flex flex-col min-h-[550px]">
-                            <h3 className="text-[9px] font-black uppercase mb-4 flex items-center text-gray-400 tracking-widest"><BookOpenIcon className="w-4 h-4 mr-2"/> Inscripciones</h3>
+                            <h3 className="text-[9px] font-black uppercase mb-4 text-gray-400 tracking-widest flex items-center"><BookOpenIcon className="w-4 h-4 mr-2"/> Cátedras Inscritas</h3>
                             <div className="space-y-1.5 overflow-y-auto max-h-[450px] pr-2">
                                 {adminCourses.map(course => {
                                     const isEnrolled = studentInscriptions.includes(course.id);
                                     return (
                                         <div key={course.id} onClick={() => toggleInscription(course.id)} className={`flex justify-between items-center p-3 rounded-xl border-2 transition-all cursor-pointer shadow-sm ${isEnrolled ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100 hover:border-blue-100'}`}>
                                             <p className={`text-[10px] font-black truncate ${isEnrolled ? 'text-green-800' : 'text-gray-400'}`}>{course.nombre}</p>
-                                            <div className={`p-1.5 rounded-lg transition-all ${isEnrolled ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-300'}`}><CheckIcon className="w-3 h-3"/></div>
+                                            <div className={`p-1.5 rounded-lg ${isEnrolled ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-300'}`}><CheckIcon className="w-3 h-3"/></div>
                                         </div>
                                     );
                                 })}
@@ -634,16 +541,16 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                          </div>
                          {/* Notas */}
                          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-amber-500 flex flex-col min-h-[550px]">
-                            <h3 className="text-[9px] font-black uppercase mb-4 flex items-center text-gray-400 tracking-widest"><ChartBarIcon className="w-4 h-4 mr-2"/> Calificaciones</h3>
-                            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-3xl border mb-4 space-y-2 shadow-inner border-green-50">
-                                <select value={newGrade.courseId} onChange={e => setNewGrade({...newGrade, courseId: e.target.value})} className="w-full p-2.5 text-[9px] rounded-lg font-black uppercase bg-white border-none shadow-sm dark:text-gray-800"><option value="">Materia...</option>{adminCourses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
-                                <input placeholder="Evaluación" value={newGrade.title} onChange={e => setNewGrade({...newGrade, title: e.target.value})} className="w-full p-2.5 text-[10px] font-bold rounded-lg bg-white border-none shadow-sm dark:text-gray-800"/>
-                                <div className="flex gap-1.5"><input type="number" placeholder="Nota" value={newGrade.score} onChange={e => setNewGrade({...newGrade, score: e.target.value})} className="flex-1 p-2.5 text-[10px] font-black rounded-lg bg-white border-none shadow-sm dark:text-gray-800"/><button onClick={handleAddGrade} className="bg-green-600 text-white p-2.5 rounded-lg hover:bg-green-700 transition-all shadow-md active:scale-95"><PlusIcon className="w-5 h-5"/></button></div>
+                            <h3 className="text-[9px] font-black uppercase mb-4 text-gray-400 tracking-widest flex items-center"><ChartBarIcon className="w-4 h-4 mr-2"/> Calificaciones</h3>
+                            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-3xl border mb-4 space-y-2 shadow-inner border-amber-50">
+                                <select value={newGrade.courseId} onChange={e => setNewGrade({...newGrade, courseId: e.target.value})} className="w-full p-2.5 text-[9px] rounded-lg font-black bg-white dark:text-gray-800"><option value="">Materia...</option>{adminCourses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
+                                <input placeholder="Nota (Ej: 95)" value={newGrade.score} onChange={e => setNewGrade({...newGrade, score: e.target.value})} className="w-full p-2.5 text-[10px] font-black rounded-lg bg-white dark:text-gray-800 shadow-sm border-none"/>
+                                <button onClick={handleAddGrade} className="w-full bg-amber-600 text-white p-2.5 rounded-lg font-black text-[9px] uppercase shadow-md">Cargar Nota</button>
                             </div>
                             <div className="space-y-2 overflow-y-auto max-h-[300px] pr-2">
                                 {studentGrades.map(g => (
-                                    <div key={g.id} className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl flex justify-between items-center group shadow-sm transition-all border border-transparent hover:border-amber-100">
-                                        <div className="truncate text-left flex-1"><p className="text-[8px] font-black text-blue-500 uppercase">{(adminCourses.find(c => c.id === g.curso_id)?.nombre || 'G').substring(0,18)}</p><p className="text-[10px] font-bold truncate text-gray-700 dark:text-gray-200">{g.titulo_asignacion}</p></div>
+                                    <div key={g.id} className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl flex justify-between items-center group shadow-sm border border-transparent hover:border-amber-100">
+                                        <div className="truncate text-left flex-1"><p className="text-[8px] font-black text-blue-500 uppercase">{(adminCourses.find(c => c.id === g.curso_id)?.nombre || '').substring(0,18)}</p><p className="text-[10px] font-bold text-gray-700 truncate">{g.titulo_asignacion}</p></div>
                                         <div className="flex items-center space-x-2"><span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black shadow-inner">{g.puntuacion}</span><button onClick={() => handleDeleteItem('notas', g.id)} className="text-gray-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"><TrashIcon className="w-4 h-4"/></button></div>
                                     </div>
                                 ))}
@@ -651,16 +558,16 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                          </div>
                          {/* Pagos */}
                          <div className="bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] shadow-xl border-t-8 border-indigo-500 flex flex-col min-h-[550px]">
-                            <h3 className="text-[9px] font-black uppercase mb-4 flex items-center text-gray-400 tracking-widest"><CurrencyDollarIcon className="w-4 h-4 mr-2"/> Pagos</h3>
+                            <h3 className="text-[9px] font-black uppercase mb-4 text-gray-400 tracking-widest flex items-center"><CurrencyDollarIcon className="h-4 w-4 mr-2"/> Historial Pagos</h3>
                             <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-3xl border mb-4 space-y-2 shadow-inner border-indigo-100">
-                                <div className="relative"><CurrencyDollarIcon className="absolute left-3 top-2.5 w-4 h-4 text-indigo-400"/><input type="number" placeholder="Monto" value={newPayment.amount} onChange={e => setNewPayment({...newPayment, amount: e.target.value})} className="w-full pl-9 p-2.5 text-[11px] font-black rounded-lg bg-white border-none shadow-sm dark:text-gray-800"/></div>
-                                <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full p-2.5 text-[9px] rounded-lg font-black bg-white border-none shadow-sm uppercase dark:text-gray-800"><option value="Zelle">Zelle</option><option value="Pago Móvil">Pago Móvil</option><option value="Efectivo">Efectivo</option></select>
-                                <button onClick={handleAddPayment} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-black text-[9px] uppercase shadow-lg hover:bg-indigo-700 transition-all active:scale-95">Registrar</button>
+                                <input type="number" placeholder="Monto ($)" value={newPayment.amount} onChange={e => setNewPayment({...newPayment, amount: e.target.value})} className="w-full p-2.5 text-[11px] font-black rounded-lg bg-white dark:text-gray-800 border-none"/>
+                                <select value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full p-2.5 text-[9px] rounded-lg font-black bg-white dark:text-gray-800 shadow-sm uppercase border-none"><option value="Zelle">Zelle</option><option value="Pago Móvil">Pago Móvil</option><option value="Efectivo">Efectivo</option></select>
+                                <button onClick={handleAddPayment} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-black text-[9px] uppercase shadow-lg transition-all active:scale-95">Registrar</button>
                             </div>
                             <div className="space-y-2 overflow-y-auto max-h-[300px] pr-2">
                                 {studentPayments.map(p => (
-                                    <div key={p.id} className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl flex justify-between items-center group shadow-sm hover:bg-white border border-transparent hover:border-indigo-100">
-                                        <div className="truncate text-left"><p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">{p.date}</p><p className="text-[10px] font-bold truncate text-gray-700 dark:text-gray-200">{p.method}</p></div>
+                                    <div key={p.id} className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl flex justify-between items-center group shadow-sm border border-transparent hover:border-indigo-100">
+                                        <div className="truncate text-left flex-1"><p className="text-[8px] font-black text-gray-400 uppercase">{p.date}</p><p className="text-[10px] font-bold text-gray-700 truncate">{p.method}</p></div>
                                         <div className="flex items-center space-x-2"><span className="text-green-600 text-[10px] font-black">${p.amount}</span><button onClick={() => handleDeleteItem('pagos', p.id)} className="text-gray-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"><TrashIcon className="w-4 h-4"/></button></div>
                                     </div>
                                 ))}
@@ -670,26 +577,103 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
+            {/* TAB: MATERIAS (CÁTEDRAS) */}
+            {activeTab === 'courses' && (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 p-8 rounded-[3rem] shadow-2xl border-t-8 border-blue-500">
+                        <div className="relative mb-6">
+                            <input type="text" placeholder="Buscar cátedra para editar..." value={courseSearchTerm} onChange={(e) => setCourseSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-100 dark:bg-gray-900 shadow-inner border-none text-sm font-black uppercase outline-none dark:text-white" />
+                            <SearchIcon className="w-6 h-6 absolute left-4 top-3.5 text-blue-500"/>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[700px] overflow-y-auto pr-2">
+                            {adminCourses.filter(c => c.nombre.toLowerCase().includes(courseSearchTerm.toLowerCase())).map(c => (
+                                <div key={c.id} onClick={() => setSelectedCourse(c)} className={`p-4 rounded-[2rem] border-2 cursor-pointer transition-all ${selectedCourse?.id === c.id ? 'bg-blue-600 border-blue-600 text-white shadow-2xl scale-[1.02]' : 'bg-gray-50 dark:bg-gray-900/50 border-gray-100 dark:border-gray-800 hover:border-blue-400 shadow-sm'}`}>
+                                    <p className="text-xs font-black uppercase leading-none mb-1">{c.nombre}</p>
+                                    {/* Fix: Changed selectedUser to selectedCourse */}
+                                    <p className={`text-[9px] font-bold uppercase tracking-widest ${selectedCourse?.id === c.id ? 'text-blue-100' : 'text-gray-400'}`}>Cód: {c.id}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {selectedCourse ? (
+                        <div className="bg-white dark:bg-gray-800 p-8 rounded-[3rem] shadow-2xl border-t-8 border-indigo-500 space-y-6">
+                            <h3 className="font-black flex items-center text-gray-800 dark:text-white uppercase text-sm tracking-widest">Editando: {selectedCourse.nombre}</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1"><label className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Nombre</label><input value={selectedCourse.nombre} onChange={e => setSelectedCourse({...selectedCourse, nombre: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl font-bold text-sm border-none shadow-inner dark:text-gray-800"/></div>
+                                <div className="space-y-1"><label className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Profesor</label><input value={selectedCourse.profesor} onChange={e => setSelectedCourse({...selectedCourse, profesor: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl font-bold text-sm border-none shadow-inner dark:text-gray-800"/></div>
+                            </div>
+                            <div className="space-y-1"><label className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Descripción</label><textarea rows={3} value={selectedCourse.descripcion} onChange={e => setSelectedCourse({...selectedCourse, descripcion: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl font-medium text-sm border-none shadow-inner dark:text-gray-800"></textarea></div>
+                            <div className="space-y-1"><label className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Contenido Detallado</label><textarea rows={6} value={selectedCourse.contenido_detallado} onChange={e => setSelectedCourse({...selectedCourse, contenido_detallado: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl font-medium text-xs border-none shadow-inner dark:text-gray-800"></textarea></div>
+                            <button onClick={handleUpdateCourse} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl hover:bg-indigo-700 transition-all flex items-center justify-center"><CheckIcon className="w-5 h-5 mr-3"/> Guardar Cambios en Materia</button>
+                        </div>
+                    ) : (
+                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-[3rem] border-2 border-dashed flex flex-col items-center justify-center p-20 opacity-30"><BookOpenIcon className="w-20 h-20 mb-4"/><p className="font-black uppercase text-sm tracking-widest">Selecciona una materia para editar</p></div>
+                    )}
+                </div>
+            )}
+
+            {/* TAB: BIBLIOTECA (RECURSOS) */}
+            {activeTab === 'resources' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-blue-500 h-fit space-y-8">
+                        <h3 className="font-black flex items-center text-gray-700 dark:text-white uppercase text-sm tracking-widest"><PlusIcon className="w-6 h-6 mr-3 text-blue-600"/> Publicar Nuevo Material</h3>
+                        <div className="space-y-4 text-left">
+                            <select value={newItem.courseId} onChange={e => setNewItem({...newItem, courseId: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl font-black text-sm border-none shadow-inner dark:text-gray-800"><option value="">Materia de destino...</option>{adminCourses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
+                            <input type="text" value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} placeholder="Título del Material (Ej: Lectura Semana 1)" className="w-full p-4 bg-gray-50 rounded-2xl font-black text-sm border-none shadow-inner dark:text-gray-800"/>
+                            <div className="flex bg-gray-100 p-2 rounded-2xl gap-2">
+                                {['pdf', 'video', 'audio', 'link'].map(t => (
+                                    <button key={t} onClick={() => setNewItem({...newItem, type: t as any})} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${newItem.type === t ? 'bg-white text-blue-600 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>{t}</button>
+                                ))}
+                            </div>
+                            {newItem.type === 'link' ? (
+                                <input type="text" value={newItem.content} onChange={e => setNewItem({...newItem, content: e.target.value})} placeholder="Pega el URL aquí..." className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-sm border-none shadow-inner dark:text-gray-800"/>
+                            ) : (
+                                <div onClick={() => fileInputRef.current?.click()} className="w-full p-10 border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 bg-gray-50/50 group transition-all">
+                                    <UploadIcon className="w-10 h-10 mb-2 text-gray-300 group-hover:text-blue-500"/>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{selectedFile ? selectedFile.name : 'Click para subir archivo local'}</p>
+                                    <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept={newItem.type === 'pdf' ? '.pdf' : newItem.type === 'video' ? 'video/*' : 'audio/*'}/>
+                                </div>
+                            )}
+                            <button onClick={handlePostResource} disabled={isSaving} className={`w-full bg-blue-600 text-white py-6 rounded-[2.5rem] font-black text-[11px] uppercase shadow-2xl flex items-center justify-center transition-all ${isSaving ? 'opacity-50' : 'active:scale-95'}`}><SendIcon className="w-5 h-5 mr-3"/> {isSaving ? 'Publicando...' : 'Publicar Material Oficial'}</button>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl overflow-hidden h-[750px] flex flex-col border dark:border-gray-700">
+                        <div className="p-8 bg-gray-100 dark:bg-gray-900 border-b font-black text-[11px] uppercase text-gray-400 tracking-widest flex justify-between items-center">Biblioteca Compartida <span className="text-blue-500">{courseResources.length} ITEMS</span></div>
+                        <div className="flex-1 overflow-y-auto divide-y dark:divide-gray-700">
+                            {courseResources.map(res => (
+                                <div key={res.id} className="p-6 hover:bg-gray-50 transition-all flex justify-between items-center group">
+                                    <div className="flex items-center text-left">
+                                        <div className="p-3 bg-blue-50 text-blue-600 rounded-xl mr-4">{res.type === 'video' ? <VideoIcon className="w-5 h-5"/> : res.type === 'pdf' ? <DocumentTextIcon className="w-5 h-5"/> : <LinkIcon className="w-5 h-5"/>}</div>
+                                        <div><p className="text-sm font-black text-gray-800 truncate w-64 uppercase leading-none mb-1">{res.title}</p><p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">{adminCourses.find(c => c.id === res.courseId)?.nombre || res.courseId}</p></div>
+                                    </div>
+                                    <button onClick={() => handleDeleteItem('recursos', res.id)} className="text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><TrashIcon className="w-5 h-5"/></button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* TAB: ANUNCIOS */}
             {activeTab === 'announcements' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-indigo-500 h-fit space-y-8">
-                        <h3 className="font-black flex items-center text-gray-700 dark:text-white uppercase text-sm tracking-widest"><PlusIcon className="w-6 h-6 mr-3 text-indigo-600"/> Comunicado Académico Oficial</h3>
+                        <h3 className="font-black flex items-center text-gray-700 dark:text-white uppercase text-sm tracking-widest"><PlusIcon className="w-6 h-6 mr-3 text-indigo-600"/> Comunicado Académico</h3>
                         <div className="space-y-4 text-left">
-                            <input type="text" value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} placeholder="Asunto del Comunicado..." className="w-full p-5 text-sm bg-gray-50 dark:bg-gray-900/50 border-none rounded-[2rem] font-black shadow-inner outline-none dark:text-white"/>
-                            <textarea rows={6} value={newItem.content} onChange={e => setNewItem({...newItem, content: e.target.value})} placeholder="Redacta aquí el contenido íntegro del anuncio..." className="w-full p-6 text-sm bg-gray-50 dark:bg-gray-900/50 border-none rounded-[2rem] font-medium shadow-inner outline-none dark:text-white"></textarea>
-                            <button onClick={handlePostAnnouncement} disabled={isSaving} className={`w-full bg-indigo-600 text-white py-6 rounded-[2.5rem] font-black text-[11px] uppercase shadow-2xl hover:bg-indigo-700 flex items-center justify-center transition-all ${isSaving ? 'opacity-50' : 'active:scale-95'}`}><SendIcon className="w-5 h-5 mr-3"/> Publicar en el Tablón General</button>
+                            <input type="text" value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} placeholder="Asunto..." className="w-full p-5 text-sm bg-gray-50 border-none rounded-[2rem] font-black shadow-inner outline-none dark:text-gray-800"/>
+                            <textarea rows={6} value={newItem.content} onChange={e => setNewItem({...newItem, content: e.target.value})} placeholder="Contenido..." className="w-full p-6 text-sm bg-gray-50 border-none rounded-[2rem] font-medium shadow-inner outline-none dark:text-gray-800"></textarea>
+                            <button onClick={handlePostAnnouncement} disabled={isSaving} className={`w-full bg-indigo-600 text-white py-6 rounded-[2.5rem] font-black text-[11px] uppercase shadow-2xl hover:bg-indigo-700 flex items-center justify-center transition-all ${isSaving ? 'opacity-50' : 'active:scale-95'}`}><SendIcon className="w-5 h-5 mr-3"/> Publicar Aviso</button>
                         </div>
                     </div>
                     <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl overflow-hidden h-[750px] flex flex-col border dark:border-gray-700">
-                        <div className="p-8 bg-gray-100 dark:bg-gray-900 border-b font-black text-[11px] uppercase text-gray-400 tracking-widest">Histórico de Avisos</div>
+                        <div className="p-8 bg-gray-100 dark:bg-gray-900 border-b font-black text-[11px] uppercase text-gray-400 tracking-widest">Historial de Comunicados</div>
                         <div className="flex-1 overflow-y-auto divide-y dark:divide-gray-700">
-                            {allAnnouncements.length > 0 ? allAnnouncements.map(msg => (
-                                <div key={msg.id} className="p-8 hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-all flex justify-between items-start group">
-                                    <div className="text-left"><p className="text-sm font-black text-gray-800 dark:text-white leading-snug">{msg.asunto}</p><p className="text-[9px] font-black text-indigo-500 uppercase mt-3 flex items-center"><ClockIcon className="w-3.5 h-3.5 mr-2"/> Publicado el: {new Date(msg.fecha_envio).toLocaleString()}</p></div>
+                            {allAnnouncements.map(msg => (
+                                <div key={msg.id} className="p-8 hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-all flex justify-between items-start group text-left">
+                                    <div><p className="text-sm font-black text-gray-800 dark:text-white leading-snug">{msg.asunto}</p><p className="text-[9px] font-black text-indigo-500 uppercase mt-3 flex items-center"><ClockIcon className="w-3.5 h-3.5 mr-2"/> {new Date(msg.fecha_envio).toLocaleString()}</p></div>
                                     <button onClick={() => handleDeleteItem('mensajes', msg.id)} className="text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-2"><TrashIcon className="w-5 h-5"/></button>
                                 </div>
-                            )) : <div className="p-24 text-center opacity-30 flex flex-col items-center justify-center"><MailIcon className="w-20 h-20 mb-4"/><p className="font-black text-sm uppercase tracking-widest">No hay anuncios registrados</p></div>}
+                            ))}
                         </div>
                     </div>
                 </div>
