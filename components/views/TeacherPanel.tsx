@@ -412,12 +412,13 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 if (error) throw error;
             } else {
                 // Sincronizado con la restricción UNIQUE(estudiante_id, curso_id, fecha)
+                // Se agrega 'onConflict' para forzar la actualización si la fila ya existe
                 const { error } = await supabase.from('asistencias').upsert({ 
                     estudiante_id: studentId, 
                     curso_id: attCourse, 
                     fecha: attDate, 
                     estado: nextStatus 
-                });
+                }, { onConflict: 'estudiante_id,curso_id,fecha' });
                 if (error) throw error;
             }
             
