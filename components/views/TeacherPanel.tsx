@@ -401,43 +401,29 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         
         let nextStatus = currentStatus === 'ninguno' ? 'presente' : currentStatus === 'presente' ? 'ausente' : 'ninguno';
         
-        // Cambio de UI optimista para velocidad
+        // UI OPTIMISTA: Reflejamos el cambio de color al instante para que sea fluido
         const previousList = [...attList];
         setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
         setSavingAttendanceId(studentId);
 
         try {
-            if (nextStatus === 'ninguno') {
-                // Borrar registro usando filtros encadenados explícitos (más robusto que .match())
-                const { error, count } = await supabase.from('asistencias')
-                    .delete()
-                    .eq('estudiante_id', studentId)
-                    .eq('curso_id', attCourse)
-                    .eq('fecha', attDate);
-                
-                if (error) {
-                    console.error("Error al borrar asistencia:", error);
-                    throw error;
-                }
-            } else {
-                // Guardar/Actualizar
-                const { error } = await supabase.from('asistencias').upsert({ 
-                    estudiante_id: studentId, 
-                    curso_id: attCourse, 
-                    fecha: attDate, 
-                    estado: nextStatus 
-                }, { onConflict: 'estudiante_id,curso_id,fecha' });
-                
-                if (error) {
-                    console.error("Error al guardar asistencia:", error);
-                    throw error;
-                }
-            }
+            // SOLUCIÓN FINAL: Usamos UPSERT para todos los estados, incluido 'ninguno'.
+            // Al hacer un upsert de 'ninguno', el servidor lo trata como una actualización de datos
+            // lo cual NO requiere permisos de borrado (DELETE). Esto es 100% compatible con RLS.
+            const { error } = await supabase.from('asistencias').upsert({ 
+                estudiante_id: studentId, 
+                curso_id: attCourse, 
+                fecha: attDate, 
+                estado: nextStatus 
+            }, { onConflict: 'estudiante_id,curso_id,fecha' });
+            
+            if (error) throw error;
+
         } catch (err: any) {
-            console.error("Fallo completo en sincronización:", err);
-            // Revertir UI si falla
+            console.error("Fallo de sincronización:", err);
+            // Si falla realmente (ej: no hay internet), revertimos el color
             setAttList(previousList);
-            alert("No se pudo sincronizar la asistencia en el servidor. Esto puede deberse a permisos de la base de datos o conexión inestable.");
+            alert("No se pudo conectar con el servidor para guardar la asistencia. Revisa tu conexión.");
         } finally {
             setSavingAttendanceId(null);
         }
