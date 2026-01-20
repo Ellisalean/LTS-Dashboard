@@ -62,7 +62,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [editName, setEditName] = useState('');
     const [editEmail, setEditEmail] = useState('');
     const [editPassword, setEditPassword] = useState('');
-    const [editAvatarUrl, setEditAvatarUrl] = useState(''); // Nuevo estado para avatar
+    const [editAvatarUrl, setEditAvatarUrl] = useState('');
     const [editRol, setEditRol] = useState('');
     const [editActivo, setEditActivo] = useState(true);
     const [studentGrades, setStudentGrades] = useState<any[]>([]);
@@ -91,6 +91,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
     const [attList, setAttList] = useState<any[]>([]);
     const [attLoading, setAttLoading] = useState(false);
+    const [savingAttendanceId, setSavingAttendanceId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchInitialData();
@@ -215,7 +216,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             password: editPassword, 
             rol: editRol,
             activo: editActivo,
-            avatar_url: editAvatarUrl // Guardar nueva URL de imagen
+            avatar_url: editAvatarUrl
         }).eq('id', selectedStudent.id);
         
         if (!error) {
@@ -332,7 +333,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         setEditName(student.nombre);
         setEditEmail(student.email || '');
         setEditPassword(student.password || '');
-        setEditAvatarUrl(student.avatar_url || ''); // Cargar avatar actual
+        setEditAvatarUrl(student.avatar_url || '');
         setEditRol(student.rol);
         setEditActivo(student.activo);
         const [{ data: g }, { data: i }, { data: p }] = await Promise.all([
@@ -387,7 +388,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                     id: p.id, 
                     nombre: p.nombre, 
                     avatar: p.avatar_url,
-                    estado: hist?.find(h => h.student_id === p.id || h.estudiante_id === p.id)?.estado || 'ninguno'
+                    estado: hist?.find(h => h.estudiante_id === p.id)?.estado || 'ninguno'
                 }));
             setAttList(mapped);
         } catch (e) { console.error(e); }
@@ -395,15 +396,36 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     };
 
     const cycleAttendance = async (studentId: string, currentStatus: string) => {
+        if (savingAttendanceId) return;
         let nextStatus = currentStatus === 'ninguno' ? 'presente' : currentStatus === 'presente' ? 'ausente' : 'ninguno';
-        if (nextStatus === 'ninguno') {
-            await supabase.from('asistencias').delete().eq('estudiante_id', studentId).eq('curso_id', attCourse).eq('fecha', attDate);
-        } else {
-            await supabase.from('asistencias').upsert({ 
-                estudiante_id: studentId, curso_id: attCourse, fecha: attDate, estado: nextStatus 
-            }, { onConflict: 'estudiante_id,curso_id,fecha' });
+        
+        setSavingAttendanceId(studentId);
+        try {
+            if (nextStatus === 'ninguno') {
+                const { error } = await supabase.from('asistencias')
+                    .delete()
+                    .eq('estudiante_id', studentId)
+                    .eq('curso_id', attCourse)
+                    .eq('fecha', attDate);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('asistencias').upsert({ 
+                    estudiante_id: studentId, 
+                    curso_id: attCourse, 
+                    fecha: attDate, 
+                    estado: nextStatus 
+                }, { onConflict: 'estudiante_id,curso_id,fecha' });
+                if (error) throw error;
+            }
+            
+            // Actualizar estado local solo si la DB respondió bien
+            setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
+        } catch (err) {
+            console.error("Error al guardar asistencia:", err);
+            alert("No se pudo guardar la asistencia en el servidor. Verifica tu conexión.");
+        } finally {
+            setSavingAttendanceId(null);
         }
-        setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
     };
 
     const handlePostAnnouncement = async () => {
@@ -532,7 +554,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">URL de Foto</label><input type="text" value={editAvatarUrl} onChange={e => setEditAvatarUrl(e.target.value)} placeholder="https://..." className="w-full p-2.5 rounded-xl bg-gray-50 text-[10px] font-bold shadow-inner border-none outline-none dark:text-gray-800"/></div>
                                 <div className="space-y-1"><label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Rol</label><select value={editRol} onChange={e => setEditRol(e.target.value)} className="w-full p-2.5 rounded-xl bg-gray-50 text-xs font-black uppercase shadow-inner border-none outline-none dark:text-gray-800"><option value="estudiante">Estudiante</option><option value="profesor">Profesor</option><option value="admin">Administrador</option></select></div>
                                 
-                                {/* Pill Switch de Activación */}
                                 <div className="pt-2 flex flex-col items-center">
                                     <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Estado del Usuario</label>
                                     <div 
@@ -726,7 +747,16 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {attList.length > 0 ? attList.map(alumno => (
-                            <div key={alumno.id} onClick={() => cycleAttendance(alumno.id, alumno.estado)} className={`flex items-center justify-between p-6 rounded-[2.5rem] cursor-pointer transition-all border-2 shadow-sm transform hover:-translate-y-2 ${alumno.estado === 'presente' ? 'bg-green-50 border-green-200' : alumno.estado === 'ausente' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100 dark:bg-gray-700/50'}`}>
+                            <div 
+                                key={alumno.id} 
+                                onClick={() => cycleAttendance(alumno.id, alumno.estado)} 
+                                className={`flex items-center justify-between p-6 rounded-[2.5rem] cursor-pointer transition-all border-2 shadow-sm transform hover:-translate-y-2 relative overflow-hidden ${savingAttendanceId === alumno.id ? 'opacity-50' : ''} ${alumno.estado === 'presente' ? 'bg-green-50 border-green-200' : alumno.estado === 'ausente' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100 dark:bg-gray-700/50'}`}
+                            >
+                                {savingAttendanceId === alumno.id && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-white/20">
+                                        <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                )}
                                 <div className="flex items-center text-left">
                                     <img src={alumno.avatar} className="w-14 h-14 rounded-2xl mr-4 border-2 border-white shadow-md object-cover"/>
                                     <div><p className="text-xs font-black text-gray-800 dark:text-white leading-tight">{alumno.nombre}</p><p className={`text-[8px] font-black uppercase mt-1 ${alumno.estado === 'ninguno' ? 'text-gray-400' : 'text-blue-500'}`}>{alumno.estado === 'ninguno' ? 'Por Marcar' : alumno.estado}</p></div>
