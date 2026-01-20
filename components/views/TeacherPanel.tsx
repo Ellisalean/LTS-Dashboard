@@ -401,18 +401,24 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         
         let nextStatus = currentStatus === 'ninguno' ? 'presente' : currentStatus === 'presente' ? 'ausente' : 'ninguno';
         
+        // Optimista: Cambiamos la UI antes de esperar al servidor para mayor fluidez
+        const previousList = [...attList];
+        setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
         setSavingAttendanceId(studentId);
+
         try {
             if (nextStatus === 'ninguno') {
+                // Borrar el registro si volvemos a 'ninguno'
                 const { error } = await supabase.from('asistencias')
                     .delete()
-                    .eq('estudiante_id', studentId)
-                    .eq('curso_id', attCourse)
-                    .eq('fecha', attDate);
+                    .match({ 
+                        estudiante_id: studentId, 
+                        curso_id: attCourse, 
+                        fecha: attDate 
+                    });
                 if (error) throw error;
             } else {
-                // Sincronizado con la restricción UNIQUE(estudiante_id, curso_id, fecha)
-                // Se agrega 'onConflict' para forzar la actualización si la fila ya existe
+                // Upsert para presente o ausente
                 const { error } = await supabase.from('asistencias').upsert({ 
                     estudiante_id: studentId, 
                     curso_id: attCourse, 
@@ -421,11 +427,11 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 }, { onConflict: 'estudiante_id,curso_id,fecha' });
                 if (error) throw error;
             }
-            
-            setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
         } catch (err) {
             console.error("Fallo al guardar asistencia:", err);
-            alert("No se pudo guardar la asistencia en el servidor. Verifica tu conexión o refresca la página.");
+            // Revertir en caso de error
+            setAttList(previousList);
+            alert("No se pudo sincronizar la asistencia. Por favor, verifica tu conexión y asegúrate de haber elegido la materia correctamente.");
         } finally {
             setSavingAttendanceId(null);
         }
