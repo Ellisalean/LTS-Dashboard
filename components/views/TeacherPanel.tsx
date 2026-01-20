@@ -86,7 +86,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
-    // --- ESTADOS ASISTENCIA (SECCIÓN REINICIADA) ---
+    // --- ESTADOS ASISTENCIA REVISADOS ---
     const [attCourse, setAttCourse] = useState('');
     const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
     const [attList, setAttList] = useState<any[]>([]);
@@ -368,7 +368,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         fetchInitialData();
     };
 
-    // --- LÓGICA DE ASISTENCIA REINICIADA Y SEGURA ---
+    // --- LÓGICA DE ASISTENCIA SUPER SEGURA Y COMPATIBLE ---
     const loadAttendanceList = async () => {
         if (!attCourse) return alert("Selecciona una materia primero.");
         setAttLoading(true);
@@ -395,29 +395,53 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         finally { setAttLoading(false); }
     };
 
-    const handleSetAttendance = async (studentId: string, status: 'presente' | 'ausente' | 'ninguno') => {
+    // ESTA FUNCIÓN ES LA CLAVE: No usa 'upsert' directo para evitar errores de índices.
+    // En su lugar, busca si existe y luego decide si Update o Insert.
+    const handleSetAttendanceSafe = async (studentId: string, status: 'presente' | 'ausente' | 'ninguno') => {
         if (savingId) return;
         if (!attCourse) return alert("Selecciona la materia.");
 
-        // UI Optimista
+        // UI Optimista Inmediata
         const prevList = [...attList];
         setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: status } : a));
         setSavingId(studentId);
 
         try {
-            // USAMOS UPSERT: Siempre actualiza, nunca borra. Esto evita errores de permisos DELETE.
-            const { error } = await supabase.from('asistencias').upsert({ 
-                estudiante_id: studentId, 
-                curso_id: attCourse, 
-                fecha: attDate, 
-                estado: status 
-            }, { onConflict: 'estudiante_id,curso_id,fecha' });
-            
-            if (error) throw error;
-        } catch (err) {
-            console.error("Error sincronizando:", err);
+            // 1. Verificamos si existe el registro manualmente
+            const { data: existing } = await supabase
+                .from('asistencias')
+                .select('id')
+                .eq('estudiante_id', studentId)
+                .eq('curso_id', attCourse)
+                .eq('fecha', attDate)
+                .single();
+
+            let response;
+            if (existing) {
+                // 2. Si existe, actualizamos
+                response = await supabase
+                    .from('asistencias')
+                    .update({ estado: status })
+                    .eq('id', existing.id);
+            } else {
+                // 3. Si no existe, insertamos
+                response = await supabase
+                    .from('asistencias')
+                    .insert({ 
+                        estudiante_id: studentId, 
+                        curso_id: attCourse, 
+                        fecha: attDate, 
+                        estado: status 
+                    });
+            }
+
+            if (response.error) throw response.error;
+
+        } catch (err: any) {
+            console.error("Error crítico de servidor:", err);
+            // Revertimos UI solo si falla realmente
             setAttList(prevList);
-            alert("No se pudo sincronizar con el servidor. Revisa tu conexión.");
+            alert(`Fallo de Sincronización: ${err.message || 'Error desconocido'}`);
         } finally {
             setSavingId(null);
         }
@@ -487,34 +511,40 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                         {attList.length > 0 ? attList.map(alumno => (
                             <div 
                                 key={alumno.id} 
-                                className={`flex flex-col p-6 rounded-[2.5rem] bg-gray-50 dark:bg-gray-700/30 border-2 transition-all shadow-sm ${savingId === alumno.id ? 'opacity-50 pointer-events-none' : 'border-transparent hover:border-blue-100'}`}
+                                className={`flex flex-col p-6 rounded-[2.5rem] bg-gray-50 dark:bg-gray-700/30 border-2 transition-all shadow-sm ${savingId === alumno.id ? 'opacity-50 pointer-events-none border-blue-200' : 'border-transparent hover:border-blue-100'}`}
                             >
                                 <div className="flex items-center mb-6">
                                     <img src={alumno.avatar} className="w-14 h-14 rounded-2xl mr-4 border-2 border-white shadow-md object-cover"/>
                                     <div className="flex-1 overflow-hidden text-left">
-                                        <p className="text-xs font-black text-gray-800 dark:text-white truncate uppercase">{alumno.nombre}</p>
-                                        <p className="text-[8px] font-bold text-gray-400 tracking-widest mt-1">ESTADO: <span className={alumno.estado === 'presente' ? 'text-green-500' : alumno.estado === 'ausente' ? 'text-red-500' : 'text-gray-400'}>{alumno.estado.toUpperCase()}</span></p>
+                                        <p className="text-xs font-black text-gray-800 dark:text-white truncate uppercase tracking-tighter">{alumno.nombre}</p>
+                                        <div className="flex items-center mt-1">
+                                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${alumno.estado === 'presente' ? 'bg-green-100 text-green-700' : alumno.estado === 'ausente' ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-500'}`}>
+                                                {alumno.estado === 'ninguno' ? 'Sin Marca' : alumno.estado}
+                                            </span>
+                                            {savingId === alumno.id && <div className="ml-2 w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
+                                        </div>
                                     </div>
-                                    {savingId === alumno.id && <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
                                 </div>
                                 
                                 {/* SELECTOR SEGMENTADO (PILL SWITCH) - SIN AMBIGÜEDADES */}
-                                <div className="flex bg-white dark:bg-gray-800 p-1 rounded-2xl shadow-inner border dark:border-gray-700 gap-1">
+                                <div className="flex bg-white dark:bg-gray-800 p-1 rounded-2xl shadow-inner border dark:border-gray-700 gap-1 overflow-hidden">
                                     <button 
-                                        onClick={() => handleSetAttendance(alumno.id, 'presente')}
-                                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center ${alumno.estado === 'presente' ? 'bg-green-500 text-white shadow-md scale-[1.02]' : 'text-gray-400 hover:bg-gray-50'}`}
+                                        onClick={() => handleSetAttendanceSafe(alumno.id, 'presente')}
+                                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center tracking-tighter ${alumno.estado === 'presente' ? 'bg-green-500 text-white shadow-md scale-[1.02]' : 'text-gray-400 hover:bg-gray-50 hover:text-green-600'}`}
                                     >
+                                        <CheckIcon className={`w-3 h-3 mr-1 ${alumno.estado === 'presente' ? 'block' : 'hidden'}`}/>
                                         Presente
                                     </button>
                                     <button 
-                                        onClick={() => handleSetAttendance(alumno.id, 'ausente')}
-                                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center ${alumno.estado === 'ausente' ? 'bg-red-500 text-white shadow-md scale-[1.02]' : 'text-gray-400 hover:bg-gray-50'}`}
+                                        onClick={() => handleSetAttendanceSafe(alumno.id, 'ausente')}
+                                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center tracking-tighter ${alumno.estado === 'ausente' ? 'bg-red-500 text-white shadow-md scale-[1.02]' : 'text-gray-400 hover:bg-gray-50 hover:text-red-600'}`}
                                     >
+                                        <XIcon className={`w-3 h-3 mr-1 ${alumno.estado === 'ausente' ? 'block' : 'hidden'}`}/>
                                         Ausente
                                     </button>
                                     <button 
-                                        onClick={() => handleSetAttendance(alumno.id, 'ninguno')}
-                                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center ${alumno.estado === 'ninguno' ? 'bg-gray-400 text-white shadow-md' : 'text-gray-300 hover:bg-gray-50'}`}
+                                        onClick={() => handleSetAttendanceSafe(alumno.id, 'ninguno')}
+                                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center tracking-tighter ${alumno.estado === 'ninguno' ? 'bg-gray-400 text-white shadow-md' : 'text-gray-300 hover:bg-gray-100'}`}
                                     >
                                         Limpiar
                                     </button>
@@ -546,7 +576,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
-            {/* OTROS TABS (RECURSOS, TAREAS, ETC) SE MANTIENEN IGUAL... */}
+            {/* TAB: ANUNCIOS */}
             {activeTab === 'announcements' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-2xl border-t-8 border-indigo-500 h-fit space-y-8">
