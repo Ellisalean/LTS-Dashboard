@@ -397,6 +397,9 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
 
     const cycleAttendance = async (studentId: string, currentStatus: string) => {
         if (savingAttendanceId) return;
+        // VALIDACIÓN: No permitir guardar si no hay materia o fecha válida
+        if (!attCourse) return alert("Selecciona la materia antes de marcar asistencia.");
+        
         let nextStatus = currentStatus === 'ninguno' ? 'presente' : currentStatus === 'presente' ? 'ausente' : 'ninguno';
         
         setSavingAttendanceId(studentId);
@@ -422,7 +425,8 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             setAttList(prev => prev.map(a => a.id === studentId ? { ...a, estado: nextStatus } : a));
         } catch (err) {
             console.error("Error al guardar asistencia:", err);
-            alert("No se pudo guardar la asistencia en el servidor. Verifica tu conexión.");
+            // Mensaje de error más específico si falla la conexión o no existe la tabla
+            alert("Error de Servidor: Asegúrate de haber ejecutado el SQL de la tabla 'asistencias' en Supabase.");
         } finally {
             setSavingAttendanceId(null);
         }
