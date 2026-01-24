@@ -67,6 +67,10 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
     const [studentInscriptions, setStudentInscriptions] = useState<string[]>([]);
     const [studentPayments, setStudentPayments] = useState<Payment[]>([]);
 
+    // Registro Nuevo Estudiante
+    const [showRegisterModal, setShowRegisterModal] = useState(false);
+    const [registerForm, setRegisterForm] = useState({ nombre: '', email: '', password: '', rol: 'estudiante' });
+
     // Detalle Materia
     const [selectedCourse, setSelectedCourse] = useState<CourseAdminData | null>(null);
 
@@ -186,6 +190,29 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         setIsSaving(false);
     };
 
+    const handleRegisterStudent = async () => {
+        if (!registerForm.nombre || !registerForm.password) return alert("Nombre y Contraseña son obligatorios.");
+        setIsSaving(true);
+        const { error } = await supabase.from('estudiantes').insert({
+            nombre: registerForm.nombre,
+            email: registerForm.email || null,
+            password: registerForm.password,
+            rol: registerForm.rol,
+            activo: true,
+            matricula: new Date().toISOString(),
+            avatar_url: `https://i.pravatar.cc/150?u=${encodeURIComponent(registerForm.nombre)}`
+        });
+        if (!error) {
+            alert("Usuario registrado con éxito.");
+            setRegisterForm({ nombre: '', email: '', password: '', rol: 'estudiante' });
+            setShowRegisterModal(false);
+            fetchStudents();
+        } else {
+            alert("Error al registrar: " + error.message);
+        }
+        setIsSaving(false);
+    };
+
     const handleSendCreds = async () => {
         if (!selectedStudent) return;
         setIsSaving(true);
@@ -284,7 +311,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         setIsSaving(false);
     };
 
-    // --- ACCIONES TAREAS ---
     const handlePostAssignment = async () => {
         if (!newItem.courseId || !newItem.title || !newItem.date) return alert("Completa los datos de la tarea.");
         setIsSaving(true);
@@ -299,7 +325,6 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
         setIsSaving(false);
     };
 
-    // --- ACCIONES EXÁMENES ---
     const handlePostExam = async () => {
         if (!newItem.courseId || !newItem.title || !newItem.date || !newItem.time) return alert("Completa los datos del examen.");
         setIsSaving(true);
@@ -367,7 +392,14 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             <input type="text" placeholder="Buscar por nombre..." value={studentSearchTerm} onChange={(e) => setStudentSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white dark:bg-gray-700 shadow-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white" />
                             <SearchIcon className="w-6 h-6 absolute left-4 top-4 text-blue-500 group-focus-within:text-blue-600 transition-colors"/>
                         </div>
-                        {isAdmin && <button className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-green-700 flex items-center active:scale-95"><PlusIcon className="w-5 h-5 mr-2"/> Registrar Estudiante</button>}
+                        {isAdmin && (
+                            <button 
+                                onClick={() => setShowRegisterModal(true)}
+                                className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-green-700 flex items-center active:scale-95 transition-all"
+                            >
+                                <PlusIcon className="w-5 h-5 mr-2"/> Registrar Estudiante
+                            </button>
+                        )}
                     </div>
                     <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-100 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-10 py-6">Identidad</th><th className="px-10 py-6">Rol Académico</th><th className="px-10 py-6">Estado</th><th className="px-10 py-6 text-right">Ficha</th></tr></thead><tbody className="divide-y dark:divide-gray-700">{students.filter(s => s.nombre.toLowerCase().includes(studentSearchTerm.toLowerCase())).map(s => (<tr key={s.id} className="hover:bg-blue-50/30 transition-colors group"><td className="px-10 py-6 flex items-center font-bold text-sm text-gray-800 dark:text-gray-200"><img src={s.avatar_url} className="w-12 h-12 rounded-2xl mr-5 shadow-md border-2 border-white object-cover"/>{s.nombre}</td><td className="px-10 py-6 text-[10px] text-blue-500 font-black uppercase tracking-widest">{s.rol}</td><td className="px-10 py-6"><span className={`inline-flex items-center px-4 py-1 rounded-full text-[9px] font-black uppercase ${s.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.activo ? 'Activo' : 'Inactivo'}</span></td><td className="px-10 py-6 text-right"><button onClick={() => handleSelectStudent(s)} className="bg-blue-600 text-white px-8 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 shadow-lg active:scale-95">Gestionar Ficha</button></td></tr>))}</tbody></table></div>
                 </div>
@@ -441,7 +473,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                     <div className="p-10 border-b dark:border-gray-700 bg-gray-50/50">
                         <div className="relative max-w-xl shadow-xl rounded-[2rem] overflow-hidden group">
                             <input type="text" placeholder="Buscar materia por nombre o código ID..." value={courseSearchTerm} onChange={(e) => setCourseSearchTerm(e.target.value)} className="w-full pl-14 pr-6 py-5 bg-white dark:bg-gray-700 text-sm font-medium focus:ring-4 focus:ring-blue-500/20 outline-none dark:text-white" />
-                            <SearchIcon className="w-7 h-7 absolute left-5 top-4.5 text-gray-300 group-focus-within:text-blue-500 transition-colors"/>
+                            <SearchIcon className="w-7 h-7 absolute left-5 top-4.5 text-gray-200 group-focus-within:text-blue-500 transition-colors"/>
                         </div>
                     </div>
                     <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-100 dark:bg-gray-900 text-[10px] uppercase text-gray-400 font-black tracking-widest"><th className="px-12 py-7">MATERIA</th><th className="px-12 py-7 text-center">PROFESOR TITULAR</th><th className="px-12 py-7 text-right">EDICIÓN</th></tr></thead><tbody className="divide-y dark:divide-gray-700">{adminCourses.filter(c => c.nombre.toLowerCase().includes(courseSearchTerm.toLowerCase())).map(c => (<tr key={c.id} className="hover:bg-blue-50/30 transition-colors group"><td className="px-12 py-8"><p className="font-black text-gray-800 dark:text-white text-md uppercase leading-tight">{c.nombre}</p><p className="text-[10px] font-black text-blue-500 uppercase mt-1 tracking-widest">CÓDIGO: {c.id}</p></td><td className="px-12 py-8 text-center text-xs font-bold text-gray-600 dark:text-gray-300">{c.profesor}</td><td className="px-12 py-8 text-right"><button onClick={() => setSelectedCourse(c)} className="bg-blue-600 text-white px-10 py-3.5 rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95 tracking-widest">EDITAR FICHA ACADÉMICA</button></td></tr>))}</tbody></table></div>
@@ -477,7 +509,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             {courseResources.map(res => (
                                 <div key={res.id} className="p-8 hover:bg-gray-50 transition-all flex justify-between items-center group">
                                     <div className="flex items-center text-left">
-                                        <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl mr-5">{res.type === 'video' ? <VideoIcon className="w-6 h-6"/> : res.type === 'pdf' ? <DocumentTextIcon className="w-6 h-6"/> : <LinkIcon className="w-6 h-6"/>}</div>
+                                        <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl mr-5">{res.type === 'video' ? <VideoIcon className="w-6 h-6"/> : <DocumentTextIcon className="w-6 h-6"/>}</div>
                                         <div><p className="text-sm font-black text-gray-800 dark:text-white truncate w-64 uppercase">{res.title}</p><p className="text-[9px] font-black text-indigo-500 uppercase">{adminCourses.find(c => c.id === res.courseId)?.nombre || res.courseId}</p></div>
                                     </div>
                                     <button onClick={() => handleDeleteItem('recursos', res.id)} className="text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><TrashIcon className="w-5 h-5"/></button>
@@ -488,7 +520,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
-            {/* TAB: TAREAS (ACTIVADA CON FORMULARIO) */}
+            {/* TAB: TAREAS */}
             {activeTab === 'assignments' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3.5rem] shadow-2xl border-t-8 border-blue-600 h-fit space-y-8">
@@ -510,7 +542,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
-            {/* TAB: EXÁMENES (ACTIVADA CON FORMULARIO) */}
+            {/* TAB: EXÁMENES */}
             {activeTab === 'exams' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3.5rem] shadow-2xl border-t-8 border-orange-500 h-fit space-y-8">
@@ -582,6 +614,45 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL REGISTRAR ESTUDIANTE / MIEMBRO */}
+            {showRegisterModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[3.5rem] shadow-2xl overflow-hidden border-t-8 border-green-600 flex flex-col">
+                        <div className="p-8 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900">
+                            <div><h3 className="font-black text-lg text-gray-900 dark:text-white uppercase tracking-tighter">Nuevo Registro</h3><p className="text-[10px] font-black text-green-600 uppercase tracking-widest">Añadir Estudiante / Staff al Sistema</p></div>
+                            <button onClick={() => setShowRegisterModal(false)} className="p-2 bg-white dark:bg-gray-700 rounded-full shadow-lg hover:text-red-500 transition-all"><XIcon className="w-6 h-6"/></button>
+                        </div>
+                        <div className="p-8 space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Completo</label>
+                                <input value={registerForm.nombre} onChange={e => setRegisterForm({...registerForm, nombre: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none shadow-inner dark:text-white text-sm" placeholder="Ej: Juan Perez"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Email (Opcional)</label>
+                                <input value={registerForm.email} onChange={e => setRegisterForm({...registerForm, email: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none shadow-inner dark:text-white text-sm" placeholder="ejemplo@lts.edu"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Contraseña de Acceso</label>
+                                <input type="text" value={registerForm.password} onChange={e => setRegisterForm({...registerForm, password: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none shadow-inner dark:text-white text-sm" placeholder="Define una clave segura"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Rol en el Seminario</label>
+                                <select value={registerForm.rol} onChange={e => setRegisterForm({...registerForm, rol: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-black text-[11px] uppercase border-none shadow-inner dark:text-white">
+                                    <option value="estudiante">ESTUDIANTE</option>
+                                    <option value="profesor">PROFESOR</option>
+                                    <option value="admin">ADMINISTRADOR</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="p-8 border-t dark:border-gray-700">
+                            <button onClick={handleRegisterStudent} disabled={isSaving} className="w-full bg-green-600 text-white py-5 rounded-[2rem] font-black text-[11px] uppercase shadow-2xl active:scale-95 transition-all">
+                                {isSaving ? 'Registrando...' : 'Confirmar Registro'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
