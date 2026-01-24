@@ -69,7 +69,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
 
     // Registro Nuevo Estudiante
     const [showRegisterModal, setShowRegisterModal] = useState(false);
-    const [registerForm, setRegisterForm] = useState({ nombre: '', email: '', password: '', rol: 'estudiante' });
+    const [registerForm, setRegisterForm] = useState({ nombre: '', email: '', password: '', rol: 'estudiante', avatar_url: '' });
 
     // Detalle Materia
     const [selectedCourse, setSelectedCourse] = useState<CourseAdminData | null>(null);
@@ -200,11 +200,11 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
             rol: registerForm.rol,
             activo: true,
             matricula: new Date().toISOString(),
-            avatar_url: `https://i.pravatar.cc/150?u=${encodeURIComponent(registerForm.nombre)}`
+            avatar_url: registerForm.avatar_url || `https://i.pravatar.cc/150?u=${encodeURIComponent(registerForm.nombre)}`
         });
         if (!error) {
             alert("Usuario registrado con éxito.");
-            setRegisterForm({ nombre: '', email: '', password: '', rol: 'estudiante' });
+            setRegisterForm({ nombre: '', email: '', password: '', rol: 'estudiante', avatar_url: '' });
             setShowRegisterModal(false);
             fetchStudents();
         } else {
@@ -509,7 +509,7 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             {courseResources.map(res => (
                                 <div key={res.id} className="p-8 hover:bg-gray-50 transition-all flex justify-between items-center group">
                                     <div className="flex items-center text-left">
-                                        <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl mr-5">{res.type === 'video' ? <VideoIcon className="w-6 h-6"/> : <DocumentTextIcon className="w-6 h-6"/>}</div>
+                                        <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl mr-5">{res.type === 'video' ? <VideoIcon className="w-6 h-6"/> : res.type === 'pdf' ? <DocumentTextIcon className="w-6 h-6"/> : <LinkIcon className="w-6 h-6"/>}</div>
                                         <div><p className="text-sm font-black text-gray-800 dark:text-white truncate w-64 uppercase">{res.title}</p><p className="text-[9px] font-black text-indigo-500 uppercase">{adminCourses.find(c => c.id === res.courseId)?.nombre || res.courseId}</p></div>
                                     </div>
                                     <button onClick={() => handleDeleteItem('recursos', res.id)} className="text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><TrashIcon className="w-5 h-5"/></button>
@@ -634,6 +634,10 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                             <div className="space-y-1">
                                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Email (Opcional)</label>
                                 <input value={registerForm.email} onChange={e => setRegisterForm({...registerForm, email: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none shadow-inner dark:text-white text-sm" placeholder="ejemplo@lts.edu"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">URL Foto de Perfil (Opcional)</label>
+                                <input value={registerForm.avatar_url} onChange={e => setRegisterForm({...registerForm, avatar_url: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none shadow-inner dark:text-white text-sm" placeholder="URL de la imagen..."/>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Contraseña de Acceso</label>
