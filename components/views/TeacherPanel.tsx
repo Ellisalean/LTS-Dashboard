@@ -421,12 +421,13 @@ const TeacherPanel: React.FC<{ user: User }> = ({ user }) => {
                         {/* Tarjeta 1: Perfil General */}
                         <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl border-t-[12px] border-blue-600 flex flex-col p-8 overflow-hidden min-h-[700px]">
                             <div className="flex flex-col items-center mb-8">
-                                <img src={selectedStudent.avatar_url} className="w-32 h-32 rounded-3xl object-cover shadow-2xl border-4 border-white mb-4" alt="Avatar"/>
+                                <img src={editAvatarUrl || selectedStudent.avatar_url} className="w-32 h-32 rounded-3xl object-cover shadow-2xl border-4 border-white mb-4" alt="Avatar"/>
                                 <h2 className="text-xl font-black text-center text-gray-900 dark:text-white uppercase leading-none">{selectedStudent.nombre}</h2>
-                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mt-1">ESTUDIANTE</p>
+                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mt-1">{editRol.toUpperCase()}</p>
                             </div>
                             <div className="space-y-4 flex-1">
                                 <div className="space-y-1"><label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label><input value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold text-xs border-none shadow-inner dark:text-white"/></div>
+                                <div className="space-y-1"><label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Foto de Perfil (URL)</label><input value={editAvatarUrl} onChange={e => setEditAvatarUrl(e.target.value)} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold text-xs border-none shadow-inner dark:text-white" placeholder="URL de la imagen..."/></div>
                                 <div className="space-y-1"><label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Clave</label><input value={editPassword} onChange={e => setEditPassword(e.target.value)} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold text-xs border-none shadow-inner dark:text-white"/></div>
                                 <div className="space-y-1"><label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Rol</label><select value={editRol} onChange={e => setEditRol(e.target.value)} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-black text-[11px] uppercase border-none shadow-inner dark:text-white"><option value="estudiante">ESTUDIANTE</option><option value="profesor">PROFESOR</option><option value="admin">ADMINISTRADOR</option></select></div>
                                 <div className="pt-4 flex flex-col items-center">
